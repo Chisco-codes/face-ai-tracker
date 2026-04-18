@@ -1,0 +1,25 @@
+# ── NEVER commit these ──────────────────────────────────────
+# Your API key lives here — keep it secret
+server/.env
+
+# Node modules — too large, reinstall with npm install
+server/node_modules/
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/settings.json
+*.swp
+*.swo
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
