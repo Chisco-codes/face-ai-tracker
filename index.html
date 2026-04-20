@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Face AI Tracker</title>
+
+  <!-- PWA Manifest — makes app installable on phone and desktop -->
+  <link rel="manifest" href="manifest.json"/>
+
+  <!-- iOS PWA support -->
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="FaceAI"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+
+  <!-- Theme colour — matches the app accent colour -->
+  <meta name="theme-color" content="#00e5ff"/>
+  <meta name="background-color" content="#0a0c12"/>
+
+  <!-- SEO and social sharing -->
+  <meta name="description" content="Real-time AI face analysis — emotion detection, focus scoring, fatigue monitoring and wellness coaching."/>
+  <meta name="keywords" content="face tracking, emotion detection, focus score, AI wellness, attention monitoring"/>
+  <meta property="og:title" content="Face AI Tracker"/>
+  <meta property="og:description" content="Real-time AI-powered behavioural analysis. Know your emotional state, focus level, and fatigue in real time."/>
+  <meta property="og:type" content="website"/>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96.png"/>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════
+       TOP NAV BAR
+  ══════════════════════════════════════════════ -->
+  <nav class="topnav">
+    <div class="topnav-brand">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="8" r="5" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M3 19c0-3.87 4.03-7 9-7s9 3.13 9 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="9" cy="7" r="1" fill="currentColor"/>
+          <circle cx="15" cy="7" r="1" fill="currentColor"/>
+        </svg>
+      </div>
+      <span class="brand-name">Face AI Tracker</span>
+      <span class="brand-version">v3.0</span>
+    </div>
+
+    <div class="topnav-status">
+      <div class="live-indicator" id="live-indicator">
+        <span class="live-dot" id="live-dot"></span>
+        <span id="live-label">Offline</span>
+      </div>
+      <div class="session-timer" id="session-timer" style="display:none;">
+        <span class="timer-label">Session</span>
+        <span class="timer-value" id="timer-value">00:00</span>
+      </div>
+    </div>
+
+    <div class="topnav-actions">
+      <button id="start-btn" class="btn-primary" disabled>Loading...</button>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════
+       MAIN DASHBOARD LAYOUT
+       Left column: video feed
+       Right column: scrollable panels
+  ══════════════════════════════════════════════ -->
+  <div class="dashboard">
+
+    <!-- ── VIDEO COLUMN ─────────────────────── -->
+    <div class="video-col">
+
+      <!-- Status bar -->
+      <div class="status-bar">
+        <span id="status-dot" class="dot dot--waiting"></span>
+        <span id="status-text">Waiting for camera...</span>
+        <span class="status-fps" id="fps-value">—</span>
+      </div>
+
+      <!-- Video wrapper with canvas overlay -->
+      <div class="video-wrapper" style="position:relative;">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="overlay-canvas"></canvas>
+
+        <!-- Calibration overlay -->
+        <div id="calib-status" class="calib-overlay" style="display:none;">
+          <div class="calib-content">
+            <div class="calib-icon">👁</div>
+            <p class="calib-label">Calibrating... 0%</p>
+            <div class="calib-bar-track"><div class="calib-bar-fill"></div></div>
+            <p class="calib-hint">Keep eyes <strong>OPEN</strong> — look straight at camera</p>
+          </div>
+        </div>
+
+        <!-- Live overlay stats on the video -->
+        <div class="video-overlay-stats" id="video-overlay-stats" style="display:none;">
+          <div class="vos-item">
+            <span class="vos-label">EAR</span>
+            <span class="vos-value" id="vos-ear">—</span>
+          </div>
+          <div class="vos-divider"></div>
+          <div class="vos-item">
+            <span class="vos-label">Focus</span>
+            <span class="vos-value" id="vos-focus">—</span>
+          </div>
+          <div class="vos-divider"></div>
+          <div class="vos-item">
+            <span class="vos-label">Blinks</span>
+            <span class="vos-value" id="vos-blinks">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feedback banner below video -->
+      <div class="feedback-banner" id="feedback-banner">
+        <span class="feedback-icon" id="feedback-icon">💡</span>
+        <p class="feedback-text" id="feedback-text">Start detection to see real-time feedback...</p>
+      </div>
+
+    </div>
+
+    <!-- ── PANELS COLUMN ─────────────────────── -->
+    <div class="panels-col">
+
+      <!-- EMOTION CARD -->
+      <div class="card" id="emotion-card">
+        <div class="card-header">
+          <h2 class="card-title">Emotion</h2>
+          <span class="card-badge badge-ai">AI</span>
+        </div>
+
+        <div class="emotion-hero">
+          <span class="emotion-emoji-large" id="emotion-emoji">😐</span>
+          <div>
+            <div class="emotion-name-large" id="emotion-name">Neutral</div>
+            <div class="emotion-conf-text" id="emotion-confidence">—</div>
+          </div>
+        </div>
+
+        <div class="emotion-grid">
+          <div class="emotion-row"><span class="er-label">😊 Happy</span>    <div class="er-track"><div class="er-fill fill-happy"     id="bar-happy"     style="width:0%"></div></div><span class="er-pct" id="pct-happy">0%</span></div>
+          <div class="emotion-row"><span class="er-label">😐 Neutral</span>  <div class="er-track"><div class="er-fill fill-neutral"   id="bar-neutral"   style="width:0%"></div></div><span class="er-pct" id="pct-neutral">0%</span></div>
+          <div class="emotion-row"><span class="er-label">😔 Sad</span>      <div class="er-track"><div class="er-fill fill-sad"       id="bar-sad"       style="width:0%"></div></div><span class="er-pct" id="pct-sad">0%</span></div>
+          <div class="emotion-row"><span class="er-label">😠 Angry</span>    <div class="er-track"><div class="er-fill fill-angry"     id="bar-angry"     style="width:0%"></div></div><span class="er-pct" id="pct-angry">0%</span></div>
+          <div class="emotion-row"><span class="er-label">😲 Surprised</span><div class="er-track"><div class="er-fill fill-surprised" id="bar-surprised" style="width:0%"></div></div><span class="er-pct" id="pct-surprised">0%</span></div>
+          <div class="emotion-row"><span class="er-label">😨 Fearful</span>  <div class="er-track"><div class="er-fill fill-fearful"   id="bar-fearful"   style="width:0%"></div></div><span class="er-pct" id="pct-fearful">0%</span></div>
+          <div class="emotion-row"><span class="er-label">🤢 Disgusted</span><div class="er-track"><div class="er-fill fill-disgusted" id="bar-disgusted" style="width:0%"></div></div><span class="er-pct" id="pct-disgusted">0%</span></div>
+        </div>
+        <p class="card-note" id="emotion-status">Loading emotion model...</p>
+      </div>
+
+      <!-- FOCUS SCORE CARD -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Focus Score</h2>
+          <span class="focus-score-badge" id="focus-score-badge">—</span>
+        </div>
+
+        <div class="focus-ring-wrap">
+          <svg class="focus-ring" viewBox="0 0 120 120">
+            <circle class="ring-bg"   cx="60" cy="60" r="50" />
+            <circle class="ring-fill" cx="60" cy="60" r="50" id="focus-ring-fill"
+              stroke-dasharray="314" stroke-dashoffset="314"/>
+          </svg>
+          <div class="focus-ring-center">
+            <span class="focus-ring-number" id="focus-score">0</span>
+            <span class="focus-ring-label">/ 100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- METRICS GRID — 4 metric tiles -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Live Metrics</h2>
+        </div>
+        <div class="metric-grid">
+
+          <div class="metric-tile">
+            <div class="metric-tile-label">Eye Openness</div>
+            <div class="metric-tile-value" id="ear-value">—</div>
+            <div class="metric-tile-sub">EAR ratio</div>
+          </div>
+
+          <div class="metric-tile">
+            <div class="metric-tile-label">Blink Rate</div>
+            <div class="metric-tile-value" id="blink-rate">—</div>
+            <div class="metric-tile-sub">per min</div>
+          </div>
+
+          <div class="metric-tile">
+            <div class="metric-tile-label">Head Tilt</div>
+            <div class="metric-tile-value" id="head-tilt">—</div>
+            <div class="metric-tile-sub">degrees</div>
+          </div>
+
+          <div class="metric-tile">
+            <div class="metric-tile-label">Head Nod</div>
+            <div class="metric-tile-value" id="head-nod">—</div>
+            <div class="metric-tile-sub">degrees</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- SESSION STATS CARD -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Session Stats</h2>
+        </div>
+        <div class="session-stats">
+          <div class="stat-row">
+            <span class="stat-label">Face detected</span>
+            <span class="stat-value" id="face-detected">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Landmarks</span>
+            <span class="stat-value" id="landmark-count">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Total blinks</span>
+            <span class="stat-value" id="blink-count">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODEL STATUS CARD -->
+      <div class="card card-compact">
+        <div class="card-header">
+          <h2 class="card-title">System</h2>
+        </div>
+        <div class="session-stats">
+          <div class="stat-row">
+            <span class="stat-label">TensorFlow.js</span>
+            <span class="stat-value" id="tf-status">Loading...</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Face Mesh</span>
+            <span class="stat-value" id="model-status">Not loaded</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Emotion AI</span>
+            <span class="stat-value" id="emotion-model-status">Not loaded</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">AI Chat Server</span>
+            <span class="stat-value" id="server-status">Not connected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI CHATBOX — Phase 5 -->
+      <div class="card chat-card">
+        <div class="card-header">
+          <h2 class="card-title">AI Assistant</h2>
+          <div class="chat-header-right">
+            <span class="card-badge badge-ai">Claude</span>
+            <span class="chat-server-dot" id="chat-server-dot"></span>
+          </div>
+        </div>
+
+        <!--
+          CHAT MESSAGES AREA
+          Auto-scrolls to the latest message.
+          Messages are injected by JavaScript.
+        -->
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-msg chat-msg--system">
+            <p>Start detection and the AI will automatically analyse your state every 15 seconds. You can also type a question below.</p>
+          </div>
+        </div>
+
+        <!-- Auto-analysis toggle -->
+        <div class="chat-auto-row">
+          <label class="chat-toggle-label">
+            <input type="checkbox" id="auto-analyze-toggle" checked/>
+            <span class="chat-toggle-track"><span class="chat-toggle-thumb"></span></span>
+            <span>Auto-analyse every 45s</span>
+          </label>
+          <span class="chat-status-text" id="chat-status-text">Server offline</span>
+        </div>
+
+        <!-- Manual message input -->
+        <div class="chat-input-row">
+          <input
+            type="text"
+            id="chat-input"
+            class="chat-input"
+            placeholder="Ask something... e.g. How focused am I?"
+            maxlength="200"
+          />
+          <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- BUILD PROGRESS -->
+      <div class="card card-compact">
+        <div class="card-header"><h2 class="card-title">Build Progress</h2></div>
+        <ul class="phase-list">
+          <li class="phase-item phase-done">Phase 1 — Face Landmarks ✓</li>
+          <li class="phase-item phase-done">Phase 2 — Basic Metrics ✓</li>
+          <li class="phase-item phase-done">Phase 3 — Emotion Detection ✓</li>
+          <li class="phase-item phase-done">Phase 4 — Professional UI ✓</li>
+          <li class="phase-item phase-done">Phase 5 — AI Chatbox ✓</li>
+          <li class="phase-item phase-next">Phase 6 — Deploy & Publish</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.5/dist/face-landmarks-detection.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
