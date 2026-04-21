@@ -96,7 +96,7 @@ self.addEventListener('fetch', function(event) {
         return cached;
       }
 
-      // Not in cache — fetch from network and cache it
+      // fetch from network and cache it
       return fetch(event.request).then(function(response) {
         if (!response || response.status !== 200 || response.type === 'opaque') {
           return response;
