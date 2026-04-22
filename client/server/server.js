@@ -12,9 +12,37 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({
-  origin: ['http://localhost:5500','http://127.0.0.1:5500',
-           'http://localhost:3000','http://127.0.0.1:3000',
-           'http://localhost:5173'],
+  // Allow requests from GitHub Pages, localhost (dev), and any other origin
+  // We use a function so we can log which origin is connecting
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    var allowed = [
+      // GitHub Pages — update YOUR_USERNAME to your actual GitHub username
+      'https://chisco-codes.github.io',
+      // Local development
+      'http://localhost:5500',
+      'http://127.0.0.1:5500',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5173',
+    ];
+
+    // Also allow any github.io subdomain (covers all GitHub Pages)
+    if (origin.endsWith('.github.io') || allowed.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Allow Railway's own domain (for health checks)
+    if (origin.includes('railway.app')) {
+      return callback(null, true);
+    }
+
+    // In production allow all — you can tighten this later
+    callback(null, true);
+  },
+  credentials: true,
 }));
 app.use(express.json());
 

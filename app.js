@@ -681,15 +681,39 @@ async function loadModels() {
 async function startCamera() {
   setStatus('Requesting camera permission...', 'waiting');
   try {
+    // Detect if on mobile — request portrait dimensions for better face framing
+    var isMobile = window.innerWidth <= 480 ||
+                   /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    var videoConstraints = isMobile
+      ? {
+          // Portrait mode on mobile — taller than wide so face fills frame
+          width:      { ideal: 480 },
+          height:     { ideal: 640 },
+          facingMode: 'user',
+        }
+      : {
+          // Landscape on desktop
+          width:      { ideal: 640 },
+          height:     { ideal: 480 },
+          facingMode: 'user',
+        };
+
     var stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+      video: videoConstraints,
       audio: false,
     });
+
     DOM.video.srcObject = stream;
     await new Promise(function(r) { DOM.video.addEventListener('loadedmetadata', r, { once: true }); });
     await new Promise(function(r) { DOM.video.addEventListener('canplay',        r, { once: true }); });
+
+    // Set canvas to exact video pixel dimensions
     DOM.canvas.width  = DOM.video.videoWidth;
     DOM.canvas.height = DOM.video.videoHeight;
+
+    console.log('[Camera] Resolution:', DOM.video.videoWidth, 'x', DOM.video.videoHeight,
+                '| Mobile:', isMobile);
     return true;
   } catch (err) {
     setStatus('Camera error: ' + err.message, 'error');
@@ -1089,7 +1113,7 @@ async function init() {
 
 var CHAT = {
 SERVER_URL: 'https://face-ai-tracker-production.up.railway.app',
-  AUTO_INTERVAL_MS: 45000,   // auto-analyze every 45 seconds
+AUTO_INTERVAL_MS: 45000,   // auto-analyze every 45 seconds
                              // Gemini free tier: 15 req/min, 1500/day
                              // 45s = max ~80 requests/hour — safe and generous
   serverOnline:     false,

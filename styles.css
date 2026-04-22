@@ -938,11 +938,31 @@ canvas#overlay-canvas {
   .session-timer .timer-label { display: none; }
   .btn-primary { padding: 8px 14px; font-size: 0.8rem; }
   .btn-install  { padding: 7px 10px; font-size: 0.75rem; }
-  .dashboard { padding: calc(var(--nav-h) + 0.75rem) 0.75rem 2rem; gap: 0.75rem; }
+  .dashboard {
+    padding: calc(var(--nav-h) + 0.75rem) 0.75rem 2rem;
+    gap: 0.75rem;
+  }
   .card { padding: 0.9rem 1rem; }
   .focus-ring-wrap { width: 110px; height: 110px; }
   .metric-grid { gap: 6px; }
   .chat-messages { max-height: 200px; }
+
+  /* Make video taller on mobile so face fills the frame */
+  .video-wrapper {
+    aspect-ratio: 3 / 4;  /* portrait ratio — better for phone selfie camera */
+  }
+
+  /* Feedback banner smaller on mobile */
+  .feedback-banner {
+    padding: 10px 12px;
+    min-height: 44px;
+  }
+  .feedback-text { font-size: 0.82rem; }
+
+  /* Video overlay stats — smaller pill on mobile */
+  .vos-item { padding: 5px 10px; }
+  .vos-value { font-size: 0.78rem; }
+  .vos-label { font-size: 0.58rem; }
 }
 
 @media (max-width: 360px) {
