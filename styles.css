@@ -854,9 +854,11 @@ canvas#overlay-canvas {
   border-radius: var(--radius-sm);
   color:         var(--text);
   font-family:   var(--font);
-  font-size:     0.82rem;
+  font-size:     16px; /* MUST be 16px+ on iOS to prevent auto-zoom */
   outline:       none;
   transition:    border-color var(--transition);
+  /* Prevent iOS from rounding the corners differently */
+  -webkit-appearance: none;
 }
 .chat-input:focus        { border-color: var(--accent); }
 .chat-input::placeholder { color: var(--text-3); }
@@ -968,4 +970,52 @@ canvas#overlay-canvas {
 @media (max-width: 360px) {
   .brand-version { display: none; }
   .video-overlay-stats { display: none !important; }
+}
+
+/* ── iOS INSTALL BANNER ──────────────────────────────────────── */
+.ios-install-card {
+  border-color: rgba(0,229,255,0.3);
+  background:   linear-gradient(135deg, var(--surface) 0%, rgba(0,229,255,0.05) 100%);
+}
+
+.ios-install-content {
+  display:     flex;
+  align-items: center;
+  gap:         12px;
+}
+
+.ios-install-icon {
+  font-size:   1.8rem;
+  flex-shrink: 0;
+}
+
+.ios-install-text {
+  flex: 1;
+}
+
+.ios-install-text strong {
+  display:   block;
+  font-size: 0.875rem;
+  color:     var(--text);
+}
+
+.ios-install-text p {
+  font-size:  0.78rem;
+  color:      var(--text-2);
+  margin-top: 3px;
+}
+
+.ios-install-close {
+  background:  transparent;
+  border:      none;
+  color:       var(--text-3);
+  font-size:   1rem;
+  cursor:      pointer;
+  padding:     4px 8px;
+  flex-shrink: 0;
+}
+
+/* Prevent any text input from triggering iOS zoom */
+input, textarea, select {
+  font-size: 16px !important;
 }

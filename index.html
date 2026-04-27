@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
   <title>Face AI Tracker</title>
 
   <!-- PWA Manifest — makes app installable on phone and desktop -->
@@ -306,17 +306,16 @@
         </div>
       </div>
 
-      <!-- BUILD PROGRESS -->
-      <div class="card card-compact">
-        <div class="card-header"><h2 class="card-title">Build Progress</h2></div>
-        <ul class="phase-list">
-          <li class="phase-item phase-done">Phase 1 — Face Landmarks ✓</li>
-          <li class="phase-item phase-done">Phase 2 — Basic Metrics ✓</li>
-          <li class="phase-item phase-done">Phase 3 — Emotion Detection ✓</li>
-          <li class="phase-item phase-done">Phase 4 — Professional UI ✓</li>
-          <li class="phase-item phase-done">Phase 5 — AI Chatbox ✓</li>
-          <li class="phase-item phase-next">Phase 6 — Deploy & Publish</li>
-        </ul>
+      <!-- iOS INSTALL BANNER — shows only on iOS Safari -->
+      <div class="card ios-install-card" id="ios-install-card" style="display:none;">
+        <div class="ios-install-content">
+          <span class="ios-install-icon">📲</span>
+          <div class="ios-install-text">
+            <strong>Install Face AI Tracker</strong>
+            <p>Tap <strong>Share</strong> then <strong>"Add to Home Screen"</strong></p>
+          </div>
+          <button class="ios-install-close" onclick="document.getElementById('ios-install-card').style.display='none'">✕</button>
+        </div>
       </div>
 
     </div>

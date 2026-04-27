@@ -159,6 +159,11 @@ var STATE = {
   // Head pose (saved every frame for AI chat access)
   headTiltAngle:    0,
   headNodAngle:     0,
+
+  // Canvas scaling — ratio of pixel size to CSS display size
+  // Used to position landmark dots correctly on mobile
+  scaleX: 1,
+  scaleY: 1,
 };
 
 
@@ -741,6 +746,15 @@ async function detectionLoop() {
       DOM.canvas.height = DOM.video.videoHeight;
     }
 
+    // Calculate scale ratio between canvas pixel size and CSS display size.
+    // On mobile the canvas may be 480px wide in pixels but 320px wide on screen.
+    // Keypoints come back in pixel space so we scale them to display space
+    // when drawing so dots land exactly on the face as seen on screen.
+    var displayW = DOM.canvas.offsetWidth  || DOM.canvas.width;
+    var displayH = DOM.canvas.offsetHeight || DOM.canvas.height;
+    STATE.scaleX = DOM.canvas.width  / displayW;
+    STATE.scaleY = DOM.canvas.height / displayH;
+
     // ── Face mesh detection (every frame) ──────────────────
     var faces = await STATE.meshModel.estimateFaces(DOM.video, { flipHorizontal: false });
     CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
@@ -1112,8 +1126,8 @@ async function init() {
 // ═══════════════════════════════════════════════════════════════
 
 var CHAT = {
-SERVER_URL: 'https://face-ai-tracker-production.up.railway.app',
-AUTO_INTERVAL_MS: 45000,   // auto-analyze every 45 seconds
+  SERVER_URL:       'http://localhost:3001',
+  AUTO_INTERVAL_MS: 45000,   // auto-analyze every 45 seconds
                              // Gemini free tier: 15 req/min, 1500/day
                              // 45s = max ~80 requests/hour — safe and generous
   serverOnline:     false,
@@ -1606,10 +1620,29 @@ function showInstallButton() {
   nav.insertBefore(btn, nav.firstChild);
 }
 
-// Hide install button if app is already installed
-window.addEventListener('appinstalled', function() {
-  var btn = document.getElementById('install-btn');
-  if (btn) btn.remove();
-  deferredInstallPrompt = null;
-  console.log('[PWA] App was installed successfully');
-});
+// ── iOS INSTALL BANNER ───────────────────────────────────────
+// iOS Safari does not support the beforeinstallprompt event.
+// Instead we show a manual instruction banner telling users
+// to use Share → Add to Home Screen.
+// Only show on iOS Safari when NOT already installed as PWA.
+
+(function() {
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isInStandaloneMode = window.navigator.standalone === true;
+  var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+  // Show banner if: on iOS, in Safari browser (not already installed)
+  if (isIOS && isSafari && !isInStandaloneMode) {
+    // Only show once per session
+    var shown = sessionStorage.getItem('ios-install-shown');
+    if (!shown) {
+      setTimeout(function() {
+        var banner = document.getElementById('ios-install-card');
+        if (banner) {
+          banner.style.display = 'block';
+          sessionStorage.setItem('ios-install-shown', '1');
+        }
+      }, 3000); // Show after 3 seconds so it does not interrupt loading
+    }
+  }
+})();
