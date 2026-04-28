@@ -254,7 +254,7 @@ body {
 video#webcam {
   width:       100%;
   height:      100%;
-  object-fit:  cover;
+  object-fit:  contain; /* contain = no cropping = landmarks always match */
   display:     block;
   transform:   scaleX(-1);
 }
@@ -949,9 +949,10 @@ canvas#overlay-canvas {
   .metric-grid { gap: 6px; }
   .chat-messages { max-height: 200px; }
 
-  /* Make video taller on mobile so face fills the frame */
+  /* On mobile use a taller aspect ratio so the face fills more of the frame
+     object-fit: contain means no cropping — dots always land on the face */
   .video-wrapper {
-    aspect-ratio: 3 / 4;  /* portrait ratio — better for phone selfie camera */
+    aspect-ratio: 3 / 4;
   }
 
   /* Feedback banner smaller on mobile */

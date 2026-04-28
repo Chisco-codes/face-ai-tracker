@@ -686,39 +686,28 @@ async function loadModels() {
 async function startCamera() {
   setStatus('Requesting camera permission...', 'waiting');
   try {
-    // Detect if on mobile — request portrait dimensions for better face framing
-    var isMobile = window.innerWidth <= 480 ||
-                   /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    var videoConstraints = isMobile
-      ? {
-          // Portrait mode on mobile — taller than wide so face fills frame
-          width:      { ideal: 480 },
-          height:     { ideal: 640 },
-          facingMode: 'user',
-        }
-      : {
-          // Landscape on desktop
-          width:      { ideal: 640 },
-          height:     { ideal: 480 },
-          facingMode: 'user',
-        };
-
+    // We use the same resolution on all devices.
+    // The video fills the wrapper using object-fit: contain (no cropping),
+    // which means MediaPipe keypoint coordinates map exactly to
+    // what the user sees — no offset or scaling issues.
     var stream = await navigator.mediaDevices.getUserMedia({
-      video: videoConstraints,
+      video: {
+        width:      { ideal: 640 },
+        height:     { ideal: 480 },
+        facingMode: 'user',
+      },
       audio: false,
     });
 
     DOM.video.srcObject = stream;
     await new Promise(function(r) { DOM.video.addEventListener('loadedmetadata', r, { once: true }); });
-    await new Promise(function(r) { DOM.video.addEventListener('canplay',        r, { once: true }); });
+    await new Promise(function(r) { DOM.video.addEventListener('canplay', r, { once: true }); });
 
     // Set canvas to exact video pixel dimensions
     DOM.canvas.width  = DOM.video.videoWidth;
     DOM.canvas.height = DOM.video.videoHeight;
 
-    console.log('[Camera] Resolution:', DOM.video.videoWidth, 'x', DOM.video.videoHeight,
-                '| Mobile:', isMobile);
+    console.log('[Camera]', DOM.video.videoWidth, 'x', DOM.video.videoHeight);
     return true;
   } catch (err) {
     setStatus('Camera error: ' + err.message, 'error');
