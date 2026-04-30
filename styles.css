@@ -973,50 +973,126 @@ canvas#overlay-canvas {
   .video-overlay-stats { display: none !important; }
 }
 
-/* ── iOS INSTALL BANNER ──────────────────────────────────────── */
-.ios-install-card {
-  border-color: rgba(0,229,255,0.3);
-  background:   linear-gradient(135deg, var(--surface) 0%, rgba(0,229,255,0.05) 100%);
-}
 
-.ios-install-content {
-  display:     flex;
-  align-items: center;
-  gap:         12px;
-}
-
-.ios-install-icon {
-  font-size:   1.8rem;
-  flex-shrink: 0;
-}
-
-.ios-install-text {
-  flex: 1;
-}
-
-.ios-install-text strong {
-  display:   block;
-  font-size: 0.875rem;
-  color:     var(--text);
-}
-
-.ios-install-text p {
-  font-size:  0.78rem;
-  color:      var(--text-2);
-  margin-top: 3px;
-}
-
-.ios-install-close {
-  background:  transparent;
-  border:      none;
-  color:       var(--text-3);
-  font-size:   1rem;
-  cursor:      pointer;
-  padding:     4px 8px;
-  flex-shrink: 0;
+/* Prevent any text input from triggering iOS zoom */
+input, textarea, select {
+  font-size: 16px !important;
 }
 
 /* Prevent any text input from triggering iOS zoom */
 input, textarea, select {
   font-size: 16px !important;
+  -webkit-appearance: none;
+}
+
+/* ── PROFESSIONAL INSTALL CARD ───────────────────────────── */
+.install-card {
+  border-color: rgba(0,229,255,0.35);
+  background:   linear-gradient(135deg, var(--surface) 0%, rgba(0,229,255,0.06) 100%);
+  padding:      1.1rem 1.25rem;
+}
+
+.install-card-header {
+  display:     flex;
+  align-items: center;
+  gap:         12px;
+  margin-bottom: 14px;
+}
+
+.install-icon-wrap {
+  width:           44px;
+  height:          44px;
+  background:      var(--accent-dim);
+  border:          1px solid rgba(0,229,255,0.3);
+  border-radius:   var(--radius-sm);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+}
+
+.install-card-text {
+  flex:           1;
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+}
+
+.install-card-text strong {
+  font-size:  0.9rem;
+  font-weight:700;
+  color:      var(--text);
+}
+
+.install-card-text span {
+  font-size: 0.75rem;
+  color:     var(--text-2);
+}
+
+.install-close-btn {
+  background:  transparent;
+  border:      none;
+  color:       var(--text-3);
+  font-size:   1.1rem;
+  cursor:      pointer;
+  padding:     4px 6px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition:  color var(--transition);
+}
+.install-close-btn:hover { color: var(--text); }
+
+/* The big install button for Android/Desktop */
+.install-btn-main {
+  width:         100%;
+  padding:       13px;
+  background:    var(--accent);
+  color:         var(--bg);
+  border:        none;
+  border-radius: var(--radius-sm);
+  font-family:   var(--font);
+  font-size:     0.95rem;
+  font-weight:   700;
+  cursor:        pointer;
+  display:       flex;
+  align-items:   center;
+  justify-content: center;
+  gap:           8px;
+  transition:    opacity 0.2s, transform 0.1s;
+}
+.install-btn-main:hover  { opacity: 0.85; }
+.install-btn-main:active { transform: scale(0.98); }
+
+/* iOS step-by-step instructions */
+.install-ios-steps {
+  display:        flex;
+  flex-direction: column;
+  gap:            10px;
+}
+
+.install-step {
+  display:     flex;
+  align-items: flex-start;
+  gap:         10px;
+  font-size:   0.82rem;
+  color:       var(--text-2);
+  line-height: 1.5;
+}
+
+.install-step strong { color: var(--text); }
+
+.install-step-num {
+  width:           22px;
+  height:          22px;
+  background:      var(--accent-dim);
+  border:          1px solid rgba(0,229,255,0.3);
+  border-radius:   50%;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       0.72rem;
+  font-weight:     700;
+  color:           var(--accent);
+  flex-shrink:     0;
+  margin-top:      1px;
 }

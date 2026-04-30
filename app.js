@@ -1210,189 +1210,254 @@ function stopAutoAnalysis() {
 // Runs 100% in browser. Gemini enhances when available.
 // ═══════════════════════════════════════════════════════════════
 
-var AI = {
-  observationCount: 0,
-  lastEmotionSeen:  null,
-  proactiveAlerts:  { drowsy: false, session30: false, session50: false },
+// ═══════════════════════════════════════════════════════════════
+// ARIA — Local Wellness Coach (offline fallback)
+// When Gemini is available it handles everything.
+// When offline this local engine provides genuine wellness support.
+// It understands complex human situations, not just face data.
+// ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════
+// ARIA — AI Wellness Coach (Local Intelligence Engine)
+//
+// This runs entirely in the browser with no server needed.
+// When Gemini is connected, it uses that for deeper responses.
+// When offline, Aria handles everything locally with genuine depth.
+//
+// Aria is not just a pattern matcher. She understands context,
+// asks follow-up questions, and goes deep on any wellness topic.
+// ═══════════════════════════════════════════════════════════════
+
+var AI = {
+  observationCount:  0,
+  lastEmotionSeen:   null,
+  conversationDepth: 0, // tracks how deep the conversation has gone
+  lastTopic:         null, // remembers what was discussed
+
+  // ── PROACTIVE OBSERVATION (auto every 45s) ────────────────
   observe: function(d) {
-    var emotion = d.emotion || 'neutral';
+    var emotion = d.emotion    || 'neutral';
     var focus   = d.focusScore || 0;
     var bpm     = d.blinkRate  || 0;
     var ear     = d.ear        || 0;
-    var tilt    = Math.abs(d.headTilt || 0);
     var nod     = Math.abs(d.headNod  || 0);
+    var tilt    = Math.abs(d.headTilt || 0);
     var mins    = Math.round((d.sessionMs || 0) / 60000);
     var conf    = d.emotionConfidence || 0;
     var thr     = STATE.earThreshold || 0.15;
 
+    // Critical states first
     if (ear < thr * 0.65 || nod > 22) {
-      return '😴 You look like you might be falling asleep. Try standing up, doing 10 jumping jacks, or splashing cold water on your face to reset your alertness.';
+      return "I can see your eyes are very heavy and your head is drooping. Your body is telling you something important right now — you need rest. Can you take even 5 minutes to close your eyes?";
     }
     if (bpm > 32) {
-      return "😰 I'm noticing a high blink rate — your eyes are telling me they're tired or stressed. Close your eyes fully for 10 seconds, then look at something distant.";
+      return "I'm noticing your blink rate is quite high — " + bpm + " times per minute. That's a sign your eyes and nervous system are under strain. Take a slow breath with me. In through the nose for 4 counts... hold... out for 6.";
     }
     if (emotion === 'angry' && conf > 0.5) {
-      return "😤 You're showing signs of frustration. Step away for 2 minutes, breathe in for 4 counts and out for 6. You'll come back with a clearer perspective.";
+      return "I can see tension in your expression right now. Something is frustrating you — and that's completely valid. Before you continue, try this: unclench your jaw, roll your shoulders back, and take one deep breath. What's on your mind?";
     }
     if (emotion === 'sad' && conf > 0.5) {
-      return "😔 Something seems to be weighing on you. A 5-minute walk outside genuinely helps — natural light and movement shift emotional states faster than anything else.";
+      return "I notice you look a little low right now. Sometimes our face shows what our words don't. I'm here if you want to talk — there's no pressure. How are you really doing?";
     }
     if (emotion === 'fearful' && conf > 0.5) {
-      return "😨 You look a bit anxious or tense. Unclench your jaw, drop your shoulders, and take one slow breath. Tension in the face reflects tension in the mind.";
+      return "Your expression is showing some anxiety or worry. That feeling is real and it matters. Try grounding yourself: name 5 things you can see right now. It sounds simple, but it works. Want to talk about what's weighing on you?";
     }
     if (emotion === 'happy' && conf > 0.6 && focus >= 70) {
-      return '😊🎯 This is your peak state — happy and highly focused at ' + focus + '/100. Use this moment for your hardest task. You have been at it ' + mins + ' min — stay in the flow.';
+      return "You look genuinely happy and focused right now — " + focus + "/100. This is your peak state. Whatever you're working on, this is the time to push forward. You've been at it " + mins + " minutes — keep that energy going.";
     }
     if (focus >= 80) {
       var msgs = [
-        '🎯 You are in deep focus at ' + focus + '/100. Eyes open, posture good, expression calm. This is optimal — stay here.',
-        '⚡ Strong focus — ' + focus + '/100. At ' + mins + ' minutes in, you are clearly in your element. Protect this time.',
-        '✅ Everything looks great — focus ' + focus + '/100, blink rate healthy, posture level. You are performing well.',
+        "You're in deep focus — " + focus + "/100. Eyes open, posture steady, expression calm. This is optimal performance. Protect this state.",
+        "Strong focus at " + focus + "/100. " + mins + " minutes in and you're clearly in your element. This kind of consistency is rare.",
+        "Everything looks excellent — focus " + focus + "/100. Your mind is sharp right now. Stay here as long as you can.",
       ];
-      return msgs[AI.observationCount % msgs.length];
+      return msgs[AI.observationCount % 3];
     }
     if (focus >= 60) {
       if (mins >= 20 && mins < 35) {
-        return '🕐 ' + mins + ' minutes in with solid focus at ' + focus + '/100. The Pomodoro method suggests a 5-minute break at 25 minutes — you decide if you are in a flow state worth protecting.';
+        return "You've been working " + mins + " minutes with solid focus at " + focus + "/100. You might be approaching your first natural break point soon — but if you're in flow, stay with it. Your body will tell you when to stop.";
       }
-      return '✅ Good focus at ' + focus + '/100 with blink rate ' + (bpm > 0 ? bpm + '/min — ' + (bpm <= 20 ? 'healthy.' : 'a little elevated.') : 'steady.');
+      return "Good focus at " + focus + "/100" + (bpm > 0 ? " with a blink rate of " + bpm + "/min — " + (bpm <= 20 ? "healthy and relaxed." : "slightly elevated, watch for fatigue.") : ".") + " You're doing well.";
     }
     if (focus < 40) {
-      return '⚠️ Focus has dipped to ' + focus + '/100. A 5-minute complete break — no screen, no phone — often recovers more than an hour of struggling through. Try it.';
+      return "Your focus has dipped to " + focus + "/100. This happens — it doesn't mean you've failed. Sometimes the best thing is a complete 5-minute break: no screen, no phone, just fresh air or water. Want some specific techniques to reset?";
     }
     if (mins >= 50) {
-      return '⏰ Nearly an hour in. Cognitive performance measurably drops after 45-60 minutes. A 10-minute break now will make your next session sharper, not weaker.';
+      return "You've been working for nearly an hour. Research consistently shows cognitive performance drops after 45-60 minutes. A 10-minute real break now will make the next hour sharper. How are you feeling?";
     }
     if (tilt > 12) {
-      return '↗ Your head is tilted ' + Math.round(tilt) + '° — this often happens when distracted. Sit upright with your screen at eye level. Posture directly affects alertness.';
+      return "I notice your head is tilted " + Math.round(tilt) + "° — this often happens unconsciously when we're uncertain or distracted. Try sitting upright, screen at eye level. Your posture directly affects your mental clarity.";
     }
-    return '🙂 Looking calm and present. Focus is ' + focus + '/100. ' + (bpm > 0 ? 'Blink rate ' + bpm + '/min — ' + (bpm <= 20 ? 'healthy.' : 'a little elevated.') : 'Keep going.');
+
+    AI.observationCount++;
+    return "You look calm and present. Focus at " + focus + "/100" + (bpm > 0 ? ", blink rate " + bpm + "/min" : "") + ". " + (mins > 0 ? mins + " minutes in — keep going." : "Getting started — you've got this.");
   },
 
+  // ── DEEP CONVERSATIONAL WELLNESS COACHING ────────────────
   answer: function(question, d) {
     var q       = question.toLowerCase().trim();
-    var emotion = d.emotion || 'neutral';
+    var emotion = d.emotion    || 'neutral';
     var focus   = d.focusScore || 0;
     var bpm     = d.blinkRate  || 0;
     var ear     = d.ear        || 0;
     var mins    = Math.round((d.sessionMs || 0) / 60000);
     var conf    = d.emotionConfidence || 0;
     var thr     = STATE.earThreshold || 0.15;
+    AI.conversationDepth++;
 
-    if (q.match(/what can i do|what should i do|help me|prescri|suggest|advice|recommend|improve|better/)) {
-      if (ear < thr * 0.7 || bpm > 28) {
-        return '🛠 Action plan for right now:\n\n1. 👁 Close your eyes completely for 10 seconds\n2. 🚶 Stand up and walk for 2 minutes\n3. 💧 Drink a glass of water\n4. 🌬 3 deep breaths: inhale 4 counts, hold 4, exhale 6\n\nCome back in 5 minutes and your numbers will be better.';
+    // ── GREETINGS ────────────────────────────────────────────
+    if (q.match(/^(hi|hello|hey|good morning|good evening|good afternoon|howdy|what'?s up|sup)\b/)) {
+      var greets = [
+        "Hello! I'm Aria, your wellness coach. I can see you right now — you're looking " + emotion + " with focus at " + focus + "/100. How are you feeling today? What's on your mind?",
+        "Hey there! Good to see you. Your face is showing " + emotion + " energy right now. How are you really doing — what brings you here today?",
+        "Hi! I'm here for you. I can see from your expression that you're " + emotion + " right now. Is there something specific you wanted to talk about, or shall I just check in on how you're doing?",
+      ];
+      return greets[AI.conversationDepth % 3];
+    }
+
+    // ── FEELING BAD / NOT GOOD TODAY ─────────────────────────
+    if (q.match(/don'?t feel (good|well|great|okay|fine)|not feeling|feel (bad|terrible|awful|horrible|low|down|off|weird)|feeling (bad|terrible|low|down|off|rough|shit|crap)/)) {
+      AI.lastTopic = 'feeling-bad';
+      return "I hear you — and I'm glad you said something. 💙\n\nLooking at your face right now, I can see " + (conf > 0.4 ? "you appear " + emotion + ", " : "") + "and that matches what you're describing.\n\nCan you tell me a bit more about what's going on? Is it more of a physical thing — like tired, drained, body feels heavy? Or is it more emotional — like something is weighing on your mind or heart? The more you share, the better I can actually help you.";
+    }
+
+    // ── PERSONAL STRUGGLES / LIFE ISSUES ────────────────────
+    if (q.match(/marital|marriage|husband|wife|partner|relationship|divorce|breakup|break.?up|couple/)) {
+      AI.lastTopic = 'relationship';
+      return "That sounds really painful, and I want you to know — what you're carrying is heavy. Relationship stress is one of the most draining things a person can go through because it affects every single part of your life.\n\nFirst, I want to acknowledge: you showing up here today, even while going through this, shows real strength.\n\nCan I ask — what feels most overwhelming about it right now? Is it the conflict itself, the uncertainty about the future, the exhaustion of it all, or something else? I want to understand where you are before I say anything else.";
+    }
+
+    if (q.match(/family|parent|child|children|kid|son|daughter|brother|sister|sibling/)) {
+      AI.lastTopic = 'family';
+      return "Family stress cuts deep — these are the people closest to us, which means the pain can be the most complicated kind.\n\nI'm listening. What's going on with your family situation? Tell me what's been happening, and let's work through it together.";
+    }
+
+    if (q.match(/work|job|boss|colleague|career|fired|laid.?off|overwork|deadline|office/)) {
+      AI.lastTopic = 'work';
+      return "Work stress is real and it has a way of following you home and into every quiet moment.\n\nI can see from your face you're carrying something — " + (focus < 50 ? "your focus score is " + focus + "/100 which suggests your mind is divided right now." : "though your focus is holding at " + focus + "/100.") + "\n\nWhat's happening at work? Tell me what's been going on — I want the full picture, not just the surface.";
+    }
+
+    if (q.match(/exhaust|burnout|burn.?out|drained|depleted|no energy|tired of everything|can'?t anymore|too much|overwhelm/)) {
+      AI.lastTopic = 'burnout';
+      return "Exhaustion at this level — the kind where everything feels like too much — is your mind and body sending a serious signal. This isn't weakness. This is your system saying it has been running on empty for too long.\n\nI want to help you, but first I need to understand: how long have you been feeling this way? Is this recent, or has it been building for a while? And is there one main thing draining you, or is it everything at once?";
+    }
+
+    if (q.match(/paranoi|paranoid|anxious|anxiety|panic|fear|scared|afraid|nervous|worry|worried|overthink/)) {
+      AI.lastTopic = 'anxiety';
+      return "What you're describing — that paranoid, anxious, hypervigilant feeling — is genuinely exhausting. When the mind is constantly scanning for threat, even rest doesn't feel like rest.\n\nI want you to know: this is a real experience, not something you're imagining or making up.\n\nRight now, let's do one thing together. Look around the room and name 5 things you can physically see. Go ahead — I'll wait. This isn't a trick; it's called grounding, and it works by anchoring your nervous system to the present moment.\n\nAfter you do that, tell me — how long have you been feeling this way?";
+    }
+
+    if (q.match(/depress|depressed|hopeless|empty|numb|worthless|don'?t care|nothing matters|point(less)?|meaningless/)) {
+      AI.lastTopic = 'depression';
+      return "Thank you for trusting me with this. What you're describing sounds really painful — that heavy, hopeless, empty feeling is one of the hardest things to carry.\n\nI want to be honest with you: I'm an AI, and what you're feeling may need more support than I alone can give. A real therapist or counsellor can help in ways I can't.\n\nBut I also don't want to just send you away — I'm here with you right now. Can you tell me more about when this started? Has something changed recently, or has it been a slow build over time?";
+    }
+
+    if (q.match(/lonely|alone|isolated|no one|nobody|no friends|no support/)) {
+      AI.lastTopic = 'loneliness';
+      return "Loneliness is one of the most painful human experiences — and it's more common than people admit, which somehow makes it lonelier.\n\nI see you. You reached out, and that matters.\n\nCan I ask — is this a new feeling, or has it been there for a while? And is it more about not having people around, or having people around but still feeling unseen and unheard?";
+    }
+
+    if (q.match(/life (is|going|falling|has been)|my life|going through|struggling|hard time|difficult|tough time|can'?t cope|falling apart/)) {
+      AI.lastTopic = 'life-challenge';
+      return "When life feels like it's going sideways, everything becomes harder — even the small things. The weight of it adds up.\n\nI can see from your expression that you're carrying something real right now. I'm not going to give you a list of tips — that's not what this moment needs.\n\nTell me what's actually going on. What does \"things are hard\" look like for you right now? The more real you can be with me, the more I can actually help.";
+    }
+
+    if (q.match(/suicid|kill myself|end it|don'?t want to (be here|live|exist)|want to die/)) {
+      AI.lastTopic = 'crisis';
+      return "I hear you, and I want you to know that what you're feeling right now matters deeply.\n\nPlease reach out to someone who can really be there for you right now:\n\n🆘 Crisis Text Line: Text HOME to 741741 (free, 24/7)\n📞 International resources: findahelpline.com\n\nI'm an AI and I want to be honest — you deserve real human support for this. Please don't face this alone. Is there someone near you right now — a friend, family member, anyone — who you could call or be with?";
+    }
+
+    // ── FOLLOW-UP / DEEPER QUESTIONS ────────────────────────
+    if (q.match(/what (should|can|do) i do|how (do|can) i|help me|advice|suggest|what next/)) {
+      if (AI.lastTopic === 'relationship') {
+        return "For relationship pain specifically — here's what I'd suggest working through:\n\n1. 🧠 Separate what you can control from what you can't. You cannot control the other person — only your responses.\n\n2. 💬 Find a safe space to express what you're feeling — a trusted friend, journal, or therapist. Keeping it all inside amplifies it.\n\n3. 🛑 Set a boundary with your own rumination: give yourself 20 minutes to think about it, then redirect. Your mind needs rest from it too.\n\n4. 💆 Take care of your body — sleep, eat, move. Emotional pain depletes physical resources faster than you realise.\n\nWhat feels most difficult to act on right now?";
       }
-      if (emotion === 'angry' || emotion === 'fearful') {
-        return '🛠 For stress and tension right now:\n\n1. 🌬 4-7-8 breathing: inhale 4, hold 7, exhale 8\n2. 💪 Clench fists tight for 5 seconds, then fully release\n3. 📝 Write down the one thing bothering you\n4. 🎵 Play one song you love before continuing\n\nStress is energy — redirect it.';
+      if (AI.lastTopic === 'burnout') {
+        return "For genuine burnout — and I want to be clear this is different from just being tired — the recovery is slower than people expect:\n\n1. ⏸ The first thing is permission. You have to give yourself permission to not be at full capacity right now. Fighting burnout with more effort makes it worse.\n\n2. 🔍 Identify your biggest energy drains. Not everything — just the top 1-2 things taking the most from you.\n\n3. 🛑 Protect one small thing that restores you, every day. Even 15 minutes. Sleep. Nature. Quiet.\n\n4. 🗣 Talk to someone — whether that's a manager, doctor, friend, or therapist. Burnout that's named can be addressed.\n\nHow long do you realistically think you can keep going at your current pace?";
       }
-      if (emotion === 'sad') {
-        return '🛠 For low mood right now:\n\n1. ☀️ Get near natural light for 5 minutes\n2. 🏃 20 jumping jacks — fastest natural mood booster\n3. 📞 Send a positive message to someone you like\n4. 🎯 Pick ONE very small task and complete it\n\nYou do not have to feel good to start. You start to feel good.';
+      if (AI.lastTopic === 'anxiety') {
+        return "For anxiety and paranoid thinking — there are things that genuinely help:\n\n1. 🌬 Breathwork: 4-7-8 breathing (in 4, hold 7, out 8) activates your parasympathetic nervous system — the calm-down switch.\n\n2. 📝 Externalise the worry: write down exactly what you're afraid of. The act of writing removes it from the loop in your head.\n\n3. 🏃 Physical movement: even a 10-minute walk burns off the stress hormones that fuel anxiety.\n\n4. 🔍 Reality-check: ask yourself \"what is the evidence this will actually happen?\" Anxiety lies.\n\nIs the anxiety connected to something specific, or is it more free-floating — like a general sense of dread?";
       }
-      if (focus < 45) {
-        return '🛠 To recover your focus right now:\n\n1. 📵 Phone face down out of reach\n2. 🎧 Instrumental music or white noise\n3. 📝 Write your single next action in one sentence\n4. ⏱ Set a 25-minute timer\n5. 💧 Drink water — dehydration reduces cognition 10-15%\n\nFocus is a muscle. These are the reps.';
-      }
-      return '🛠 You are doing well at ' + focus + '/100. To stay here:\n\n1. 🔒 Protect your environment — no new tabs\n2. ⏱ Work in 25-minute blocks with 5-minute breaks\n3. 👁 20-20-20 rule: every 20 min, look 20 feet away for 20 seconds\n4. 💧 Keep water nearby\n\nYou are already in a good state. Keep going.';
+      // Generic action advice
+      return "Based on what you've shared with me, here's where I'd start:\n\nFirst — acknowledge that what you're going through is real and it makes sense that it's affecting you. You're not weak for struggling.\n\nSecond — pick just ONE small action today. Not a list, not a plan. One thing. It could be: drink a glass of water, take a 5-minute walk, text one person you trust, or just sit quietly for 10 minutes without a screen.\n\nThird — tomorrow, do one more small thing.\n\nHealing and recovery are not linear and they are not fast. But small, consistent actions compound.\n\nWhat's the one thing you could realistically do in the next hour?";
     }
 
-    if (q.match(/feel better|feel good|cheer|happy|mood|energy|motivat/)) {
-      return '😊 To shift your energy:\n\n1. 🏃 Move your body 2 minutes — movement changes chemistry\n2. ☀️ Natural light on your face — even 3 minutes outside helps\n3. 🎵 Play a song that makes you feel powerful\n4. 🙏 Name 3 things you have done well today\n5. 📞 Send a positive message to someone\n\nYour emotion reads ' + emotion + ' right now. In 5 minutes it can be different.';
+    // ── WELLNESS COACHING TOPICS ─────────────────────────────
+    if (q.match(/meditat|mindful|present|calm down|relax|breathing|breath/)) {
+      AI.lastTopic = 'mindfulness';
+      return "Mindfulness is one of the most powerful tools we have — and it doesn't require an app or a special room.\n\nRight now, try this with me:\n\n1. Take one slow breath in through your nose for 4 counts\n2. Hold for 4 counts\n3. Out through your mouth for 6 counts\n\nDo that twice.\n\nWhen the mind is scattered, breathing is the fastest way back to the present moment. How do you feel after doing that? And is this something you want to build as a regular practice?";
     }
 
-    if (q.match(/tired|fatigue|sleepy|exhausted|drowsy|heavy|eyes hurt|eye strain/)) {
-      return '😴 Fastest fatigue recovery:\n\n1. 👁 Palming — cup warm hands over closed eyes for 30 seconds\n2. 💧 Cold water on wrists and face\n3. 🌬 5 deep breaths, exhale twice as long as inhale\n4. 🚶 5 minutes outside — natural light resets alertness\n5. 😮 Yawn deliberately 3 times\n\nYour EAR is ' + ear.toFixed(3) + ' — ' + (ear < thr * 0.8 ? 'your eyes are showing real strain.' : 'eyes are holding up okay.');
+    if (q.match(/sleep|insomnia|can'?t sleep|wake up|tired|rest/)) {
+      AI.lastTopic = 'sleep';
+      return "Sleep issues are one of the most underestimated health problems. When sleep breaks down, everything else — mood, focus, relationships, physical health — starts to deteriorate.\n\nCan I ask a few things to understand yours better:\n\nIs it trouble falling asleep, staying asleep, or waking too early?\nHow long has this been happening?\nAnd what's typically going through your mind when you can't sleep — is it a racing mind, worry, or just can't switch off?";
     }
 
-    if (q.match(/focus|concentrat|distract|attention|productiv/)) {
-      return '🎯 Focus score: ' + focus + '/100 — ' + (focus >= 75 ? 'excellent.' : focus >= 50 ? 'moderate.' : 'below your best.') + '\n\nWhat actually works:\n1. 📝 Write your next single action down\n2. 🎧 Binaural beats at 40Hz (search YouTube)\n3. ⏱ 25 min work, 5 min break\n4. 🌡 Cooler room (18-20°C) keeps the brain alert\n5. 📵 Airplane mode — each notification costs 23 minutes of focus';
+    if (q.match(/focus|concentrat|distract|productiv|motivation|procrastinat/)) {
+      AI.lastTopic = 'focus';
+      return "Focus struggles are almost never about willpower — they're usually about one of three things: mental overload, unclear priorities, or an environment fighting against you.\n\nI can see your current focus score is " + focus + "/100" + (bpm > 0 ? " and your blink rate is " + bpm + "/min." : ".") + "\n\nTell me more — when you try to focus, what actually happens? Does your mind wander to specific thoughts, do you get pulled to your phone, do you feel mentally foggy, or something else? The cause determines the fix.";
     }
 
-    if (q.match(/stress|anxious|anxiety|overwhelm|pressure|worry|nervous/)) {
-      return '🌬 For stress right now:\n\nImmediate (30 seconds):\n• Box breathing: in 4, hold 4, out 4, hold 4. Do this twice.\n\nShort term (5 minutes):\n• Brain dump — write everything on your mind on paper\n• Circle the ONE most important thing\n• Everything else can wait\n\nPosture:\n• Uncross legs, drop shoulders, unclench jaw\n\nStress is energy — give it a clear target.';
+    if (q.match(/motivat|inspire|purpose|meaning|direction|lost|don'?t know what|stuck/)) {
+      AI.lastTopic = 'purpose';
+      return "That feeling of being unmotivated or lost — it's more common than people admit, and it's often a signal, not a flaw.\n\nSometimes it means we've drifted from something that matters to us. Sometimes it means we're exhausted and our brain has nothing left for enthusiasm. Sometimes it means we need a new challenge.\n\nCan I ask: when was the last time you felt genuinely energised or excited about something? What were you doing? That memory is usually a clue.";
     }
 
-    if (q.match(/break|rest|pause/)) {
-      return '⏰ After ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ', ' + (mins >= 25 ? 'yes — your brain genuinely needs it.' : 'even a short break helps.') + '\n\nFor maximum recovery:\n1. 🚶 5 minutes walking beats sitting on your phone\n2. 👀 Look at something natural — trees, sky\n3. 🍵 Drink something warm\n4. 🧘 Do nothing deliberately for 2 minutes\n\nBreaks are not lost time. They are when the work gets processed.';
+    if (q.match(/confiden|self.esteem|self.worth|feel (stupid|dumb|useless|not enough|worthless)/)) {
+      AI.lastTopic = 'self-esteem';
+      return "The way we talk to ourselves matters enormously — and when confidence is low, the internal voice can be brutal.\n\nI want to ask you something: if a close friend said to you the things you say to yourself, how long would they remain your friend?\n\nYou reached out today. You're trying to understand yourself. That's not the behaviour of someone who is useless or not enough.\n\nWhat specifically triggered this feeling? Was it something that happened, something someone said, or is it more of a background feeling that's always there?";
     }
 
-    if (q.match(/emotion|feel|feeling|how am i|how do i look|mood|expression/)) {
-      var ed = { happy: 'engaged and positive — best state for creative work', neutral: 'calm and composed — ideal for analytical tasks', sad: 'a little low — gentle tasks or a short break might help', angry: 'tense or frustrated — energy that needs redirecting', surprised: 'alert and engaged', fearful: 'anxious or under pressure — breathing exercises will help', disgusted: 'uncomfortable with something' };
-      return '📊 Right now you appear ' + emotion + ' (' + Math.round(conf * 100) + '% confidence).\n\nIn practical terms: ' + (ed[emotion] || 'in a neutral state') + '.\n\nFocus: ' + focus + '/100, blinks: ' + (bpm > 0 ? bpm + '/min (' + (bpm <= 20 ? 'healthy' : 'elevated') + ').' : 'measuring...') + '\n\nAsk "what can I do now" for specific actions.';
+    if (q.match(/angry|anger|furious|rage|frustrated|irritated|snapping|losing it/)) {
+      AI.lastTopic = 'anger';
+      return "Anger is not a bad emotion — it's information. It usually means something important to you has been threatened or violated.\n\nThe question isn't how to make the anger go away. It's: what is the anger telling you?\n\nRight now, before we go deeper — can you do one physical thing: press your feet flat on the floor and take three slow breaths. Anger lives in the body and the body needs to release it before the mind can process it clearly.\n\nDone? Now tell me — what happened that set this off?";
     }
 
-    if (q.match(/eye|blink|ear|vision|screen/)) {
-      return '👁 Your eye metrics:\n• Openness (EAR): ' + ear.toFixed(3) + ' — ' + (ear >= thr ? 'eyes open and alert' : 'eyes partially closed') + '\n• Blink rate: ' + (bpm > 0 ? bpm + '/min (normal: 12-20)' : 'measuring...') + '\n\nFor eye health:\n1. 20-20-20 rule: every 20 min, look 20 feet away for 20 seconds\n2. Screen brightness should match room lighting\n3. Blink deliberately — screens reduce blink rate by up to 60%';
+    if (q.match(/grief|loss|death|died|lost someone|mourning|miss (him|her|them|you)/)) {
+      AI.lastTopic = 'grief';
+      return "Grief is one of the most profound human experiences, and there is no right way to do it and no timeline for it.\n\nI'm so sorry for your loss. Whatever you're feeling right now — sadness, numbness, anger, even relief, or nothing at all — it's all valid.\n\nYou don't have to fix it or move through it faster. Can you tell me about them, or about what you're carrying right now? Sometimes just speaking it out loud matters.";
     }
 
-    if (q.match(/how long|session|time|duration|minutes/)) {
-      return '⏱ Session: ' + mins + ' minute' + (mins !== 1 ? 's' : '') + '\n\n• Total blinks: ' + d.blinkCount + '\n• Focus: ' + focus + '/100\n• Emotion: ' + emotion + '\n\n' + (mins < 25 ? '✅ Good time to keep going.' : mins < 50 ? '⏰ Consider a break at 50 minutes.' : '🔴 Past the point of diminishing returns — take a real break.');
+    // ── THANKS / POSITIVE ────────────────────────────────────
+    if (q.match(/thank|thanks|helpful|appreciate|that helped|feel better|much better/)) {
+      return "I'm really glad that helped. 😊\n\nYou did the hard part — you showed up, you talked about what was real, and you were honest. That's not nothing.\n\nI'm here whenever you need to talk — whether it's about how you're feeling today, how to stay focused, or just to check in. Take care of yourself.";
     }
 
-
-    if (q.match(/what is|how does|who are you|explain/)) {
-      return '🤖 I am the AI built into Face AI Tracker.\n\nWhat I watch:\n• Emotion — 7 types via neural network\n• Eye openness (EAR) — fatigue indicator\n• Blink rate — stress and tiredness signal\n• Head position — posture and drowsiness\n• Focus score — combined 0-100 metric\n\nTry asking:\n"What can I do to feel better?"\n"How is my focus?"\n"I feel stressed — help me"\n"Should I take a break?"';
+    // ── WHAT CAN YOU DO / PRESCRIPTIONS ─────────────────────
+    if (q.match(/what can (i|you)|prescri|what should|action plan|steps|tips|how to feel|improve/)) {
+      return "Based on what I can see and what you've shared, here is where I'd focus right now:\n\n" +
+        (ear < thr * 0.8 ? "👁 Your eyes look tired — start by resting them. Close them for 30 seconds.\n\n" : "") +
+        (focus < 50 ? "🧠 Focus is low at " + focus + "/100 — your mind needs one clear task, not a list. What is the single most important thing right now?\n\n" : "") +
+        (bpm > 22 ? "😮‍💨 Your blink rate is high — take 3 slow, deliberate breaths right now.\n\n" : "") +
+        "Beyond the immediate:\n1. Name one thing draining you that you could reduce or remove\n2. Name one thing that gives you energy that you've been neglecting\n3. Do the second one today — even for 15 minutes\n\nWhat feels most actionable for you right now?";
     }
 
-    // ── GREETINGS ───────────────────────────────────────────
-    if (q.match(/^(hi|hello|hey|good morning|good afternoon|good evening|what.s up|sup)/)) {
-      return 'Hello! 👋 I can see you right now — currently reading you as ' + emotion + ' with focus at ' + focus + '/100. How can I help you today?';
+    // ── ABOUT ARIA ────────────────────────────────────────────
+    if (q.match(/who are you|what are you|your name|aria|about you|how do you work/)) {
+      return "I'm Aria — an AI wellness coach built into Face AI Tracker.\n\nWhat makes me different from a regular chatbot: I can actually see your face. In real time, I'm reading your emotions, your eye fatigue, your focus level, and your posture. I use that data to personalise every response.\n\nBut I'm also here for conversations that go beyond metrics — stress, relationships, life challenges, mental performance, anything affecting your wellbeing.\n\nI'm not a replacement for a therapist or doctor. But I'm always here, I never judge, and I genuinely want to help. What would you like to talk about?";
     }
 
-    // ── THANKS ──────────────────────────────────────────────
-    if (q.match(/thank|thanks|appreciate|helpful/)) {
-      return "You're welcome! 😊 I'm here whenever you need me. I'm watching your face in real time — just ask whenever you want to know how you're doing.";
+    // ── TESTING ───────────────────────────────────────────────
+    if (q.match(/test|testing|is this working|hello world|can you hear/)) {
+      return "Yes, I'm here and working! Here's what I can see right now:\n\n• Emotion: " + emotion + " (" + Math.round(conf * 100) + "% confidence)\n• Focus: " + focus + "/100\n• Eye openness: " + ear.toFixed(3) + "\n• Blink rate: " + (bpm > 0 ? bpm + "/min" : "measuring...") + "\n• Session: " + mins + " min\n\nEverything is running. Talk to me — about anything.";
     }
 
-    // ── WHAT CAN YOU DO ─────────────────────────────────────
-    if (q.match(/what can you do|capabilities|features|what do you know|what do you see/)) {
-      return '🤖 Here is what I can help with:\n\n👁 Your state right now — emotion, focus, fatigue, posture\n🛠 Prescriptions — exact steps to improve how you feel\n😴 Fatigue detection — I will warn you before you burn out\n🎯 Focus coaching — science-backed techniques\n💆 Stress relief — breathing, movement, mindset\n⏰ Break reminders — based on how long you have been working\n\nJust talk to me naturally. Ask anything.';
+    // ── OFF TOPIC ─────────────────────────────────────────────
+    if (q.match(/weather|news|sports|food|recipe|movie|music|game/)) {
+      return "Ha — I appreciate you testing me! I'm a wellness coach so those topics are a bit outside my expertise. But if anything is affecting how you feel — stress about the news, using food for comfort, not sleeping well — I'm genuinely here for that.\n\nRight now your focus is " + focus + "/100 and you seem " + emotion + ". Anything on your mind?";
     }
 
-    // ── MOTIVATION ──────────────────────────────────────────
-    if (q.match(/motivat|inspire|encour|i can.t|i give up|i quit|i.m done|push me/)) {
-      return '💪 You showed up. You are here, the camera is on, and you are still going.\n\nFocus is ' + focus + '/100. That is real.\n\nThe people who succeed are not the ones who feel motivated — they are the ones who act first and let the feeling follow.\n\nPick one thing. Do just that one thing. You got this.';
-    }
-
-    // ── MENTAL HEALTH ────────────────────────────────────────
-    if (q.match(/depress|lonely|hopeless|worthless|suicid|harm|crisis/)) {
-      return '💙 I hear you, and that matters.\n\nI am an AI and I cannot provide mental health support, but a real person can.\n\nPlease reach out:\n• Crisis text line: text HOME to 741741 (free, 24/7)\n• International: findahelpline.com\n• Talk to someone you trust\n\nYou do not have to handle this alone.';
-    }
-
-    // ── MEDICAL ─────────────────────────────────────────────
-    if (q.match(/sick|pain|headache|doctor|diagnos|symptom|medic/)) {
-      return '🏥 I can see your facial state but I cannot diagnose health conditions.\n\nFor medical questions please consult a doctor.\n\nWhat I can help with: focus, eye fatigue, stress levels, and mental performance during work.';
-    }
-
-    // ── FUNNY / OFF-TOPIC ────────────────────────────────────
-    if (q.match(/joke|funny|laugh|lol|haha|meme|bored/)) {
-      return '😄 Why did the computer go to therapy?\n— Because it had too many *tabs* open and could not focus.\n\nSpeaking of which — your focus is ' + focus + '/100. Want tips to improve it?';
-    }
-
-    if (q.match(/weather|news|sports|music|food|recipe/)) {
-      return '😄 Ha — I only know about one thing: you and your face.\n\nYour emotion: ' + emotion + '. Focus: ' + focus + '/100. Blink rate: ' + (bpm > 0 ? bpm + '/min' : 'measuring') + '.\n\nFor everything else, Google is your friend!';
-    }
-
-    if (q.match(/who made|who built|who created|your developer/)) {
-      return '🧑‍💻 Face AI Tracker was built with JavaScript, TensorFlow.js, MediaPipe face mesh, and Google Gemini AI.\n\nIt uses real computer vision, neural networks, and the Eye Aspect Ratio formula from academic research. Pretty powerful for a browser app.';
-    }
-
-    if (q.match(/are you real|are you human|are you ai|chatgpt|claude|gpt/)) {
-      return '🤖 I am a purpose-built AI — not ChatGPT. I was designed specifically for one job: understanding your face and helping you perform better.\n\nRight now I can see: ' + emotion + ' (' + Math.round(conf * 100) + '% confidence), focus ' + focus + '/100.';
-    }
-
-    if (q.match(/test|testing|is this working|can you hear|hello world/)) {
-      return '✅ Yes, working! Live data:\n• Emotion: ' + emotion + ' (' + Math.round(conf * 100) + '%)\n• Focus: ' + focus + '/100\n• EAR: ' + ear.toFixed(3) + '\n• Blinks: ' + (bpm > 0 ? bpm + '/min' : 'measuring') + '\n• Session: ' + mins + ' min\n\nEverything is running. Ask me anything!';
-    }
-
-    if (q.match(/meaning of life|philosophy|god|religion|politics|future|robot/)) {
-      return '🌍 Big question! I respect it.\n\nI was built to watch faces and help people perform better, not solve the universe. What I can tell you: you are here, you are working, and your brain is capable of more than it gets credit for.\n\nYour focus is ' + focus + '/100. Want to make it higher?';
-    }
-
-    // ── ULTIMATE FALLBACK ────────────────────────────────────
-    return "I'm not sure I fully understood that, but here's what I'm seeing right now:\n\nYou appear " + emotion + " with " + Math.round(conf * 100) + "% confidence. Focus is " + focus + "/100.\n\nIf you want specific help, try asking:\n• \"What can I do to feel better?\"\n• \"How is my focus?\"\n• \"I feel stressed\"\n• \"Should I take a break?\"";
+    // ── ULTIMATE FALLBACK — conversational, never dead-end ───
+    var fallbacks = [
+      "I want to make sure I understand you properly. Can you tell me a bit more about what you mean? I'm listening.",
+      "That's interesting — say more. What's behind that for you?",
+      "I hear you. What's the main thing you want me to help with right now — is it something you're feeling, something you're thinking about, or something you want to do differently?",
+      "I want to give you a useful response rather than a generic one. Can you share a bit more context about what's going on?",
+    ];
+    return fallbacks[Math.floor(AI.conversationDepth % fallbacks.length)];
   },
 };
+
 
 // ── CHAT ENGINE ──────────────────────────────────────────────
 
@@ -1573,65 +1638,74 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ── PWA INSTALL PROMPT ───────────────────────────────────────
-// Catches the browser's "install app" prompt and shows it
-// as a button in our UI so users know they can install
+// ═══════════════════════════════════════════════════════════════
+// PWA INSTALL — Unified for Android/Desktop (beforeinstallprompt)
+// and iOS Safari (manual Share → Add to Home Screen)
+// ═══════════════════════════════════════════════════════════════
+
 var deferredInstallPrompt = null;
 
+// Android/Desktop Chrome: catch the browser install prompt
 window.addEventListener('beforeinstallprompt', function(e) {
   e.preventDefault();
   deferredInstallPrompt = e;
-  showInstallButton();
+  showInstallCard('android');
 });
 
-function showInstallButton() {
-  // Add an install button to the nav bar if not already there
-  var nav = document.querySelector('.topnav-actions');
-  if (!nav || document.getElementById('install-btn')) return;
-
-  var btn = document.createElement('button');
-  btn.id        = 'install-btn';
-  btn.className = 'btn-install';
-  btn.innerHTML = '📲 Install App';
-  btn.onclick   = function() {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    deferredInstallPrompt.userChoice.then(function(result) {
-      if (result.outcome === 'accepted') {
-        console.log('[PWA] User installed the app');
-        btn.remove();
-      }
-      deferredInstallPrompt = null;
-    });
-  };
-
-  // Insert before the Start button
-  nav.insertBefore(btn, nav.firstChild);
+// Called when user clicks the big Install button (Android/Desktop)
+function triggerInstall() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(function(choice) {
+    if (choice.outcome === 'accepted') {
+      dismissInstall();
+      console.log('[PWA] Installed successfully');
+    }
+    deferredInstallPrompt = null;
+  });
 }
 
-// ── iOS INSTALL BANNER ───────────────────────────────────────
-// iOS Safari does not support the beforeinstallprompt event.
-// Instead we show a manual instruction banner telling users
-// to use Share → Add to Home Screen.
-// Only show on iOS Safari when NOT already installed as PWA.
+// Dismiss the install card
+function dismissInstall() {
+  var card = document.getElementById('install-card');
+  if (card) card.style.display = 'none';
+  sessionStorage.setItem('install-dismissed', '1');
+}
 
+// Show the install card, configured for the right platform
+function showInstallCard(platform) {
+  if (sessionStorage.getItem('install-dismissed')) return;
+  if (window.navigator.standalone === true) return; // Already installed on iOS
+
+  var card      = document.getElementById('install-card');
+  var btnMain   = document.getElementById('install-btn-main');
+  var iosSteps  = document.getElementById('install-ios-steps');
+  if (!card) return;
+
+  card.style.display = 'block';
+
+  if (platform === 'ios') {
+    if (iosSteps) iosSteps.style.display = 'flex';
+    if (btnMain)  btnMain.style.display  = 'none';
+  } else {
+    if (btnMain)  btnMain.style.display  = 'flex';
+    if (iosSteps) iosSteps.style.display = 'none';
+  }
+}
+
+// iOS Safari detection — show after 4 seconds
 (function() {
-  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  var isInStandaloneMode = window.navigator.standalone === true;
-  var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  var isIOS       = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isSafari    = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  var isStandalone = window.navigator.standalone === true;
 
-  // Show banner if: on iOS, in Safari browser (not already installed)
-  if (isIOS && isSafari && !isInStandaloneMode) {
-    // Only show once per session
-    var shown = sessionStorage.getItem('ios-install-shown');
-    if (!shown) {
-      setTimeout(function() {
-        var banner = document.getElementById('ios-install-card');
-        if (banner) {
-          banner.style.display = 'block';
-          sessionStorage.setItem('ios-install-shown', '1');
-        }
-      }, 3000); // Show after 3 seconds so it does not interrupt loading
-    }
+  if (isIOS && isSafari && !isStandalone) {
+    setTimeout(function() { showInstallCard('ios'); }, 4000);
   }
 })();
+
+// Remove card if app gets installed
+window.addEventListener('appinstalled', function() {
+  dismissInstall();
+  console.log('[PWA] App installed');
+});
