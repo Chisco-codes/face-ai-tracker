@@ -1049,6 +1049,7 @@ async function init() {
       STATE.framesSinceEmotion = 0;
       CHAT.history             = [];
       CHAT.rateLimitedUntil    = 0;
+      CHAT.lastUserMessageTime = 0;
       CHAT.consecutiveErrors   = 0;
       var ekeys = Object.keys(STATE.smoothedEmotions);
       for (var i = 0; i < ekeys.length; i++) STATE.smoothedEmotions[ekeys[i]] = 0;
@@ -1123,7 +1124,8 @@ var CHAT = {
   autoTimer:        null,
   history:          [],      // conversation history for AI context
   isWaiting:        false,   // true while waiting for a response
-  rateLimitedUntil: 0,       // timestamp — pause requests until this time
+  rateLimitedUntil: 0,
+  lastUserMessageTime: 0, — pause requests until this time
   consecutiveErrors:0,       // track errors to back off automatically
 };
 
@@ -1463,39 +1465,57 @@ var AI = {
 
 async function runAnalysis() {
   if (CHAT.isWaiting) return;
+  if (CHAT.rateLimitedUntil > performance.now()) return;
+
   CHAT.isWaiting = true;
   showTypingIndicator();
   var faceData = collectFaceData();
   var response = null;
 
-  if (CHAT.serverOnline && CHAT.rateLimitedUntil <= performance.now()) {
+  // Try Gemini first — if server connected always use it
+  if (CHAT.serverOnline) {
     try {
       var res = await fetch(CHAT.SERVER_URL + '/analyze', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          emotion: faceData.emotion, emotionConfidence: faceData.emotionConfidence,
-          focusScore: faceData.focusScore, blinkRate: faceData.blinkRate,
-          blinkCount: faceData.blinkCount, ear: faceData.ear,
-          headTilt: faceData.headTilt, headNod: faceData.headNod, sessionMs: faceData.sessionMs,
+          emotion: faceData.emotion,
+          emotionConfidence: faceData.emotionConfidence,
+          focusScore: faceData.focusScore,
+          blinkRate: faceData.blinkRate,
+          blinkCount: faceData.blinkCount,
+          ear: faceData.ear,
+          headTilt: faceData.headTilt,
+          headNod: faceData.headNod,
+          sessionMs: faceData.sessionMs,
         }),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(15000),
       });
       var data = await res.json();
-      if (res.ok && !data.error) {
+      if (res.ok && data.response) {
         response = data.response;
-        updateChatStatusText('AI ready');
       } else if (res.status === 429) {
         CHAT.rateLimitedUntil = performance.now() + 3600000;
-        updateChatStatusText('AI ready');
       }
-    } catch (e) { /* silent fallback */ }
+    } catch (e) {
+      console.warn('[auto-analyse] server error, using local');
+    }
   }
 
-  if (!response) { response = AI.observe(faceData); AI.observationCount++; }
+  // Only use local if Gemini failed
+  if (!response) {
+    response = AI.observe(faceData);
+    AI.observationCount++;
+  }
+
   removeTypingIndicator();
-  addChatMessage('ai', response);
-  CHAT.history.push({ role: 'assistant', content: response });
-  if (CHAT.history.length > 10) CHAT.history.shift();
+  // Only show auto-analysis if no user message was sent recently (last 30s)
+  var lastUserTime = CHAT.lastUserMessageTime || 0;
+  if (performance.now() - lastUserTime > 30000) {
+    addChatMessage('ai', response);
+    CHAT.history.push({ role: 'assistant', content: response });
+    if (CHAT.history.length > 20) CHAT.history.shift();
+  }
   CHAT.isWaiting = false;
 }
 
@@ -1511,31 +1531,53 @@ async function sendChatMessage() {
   if (!text || CHAT.isWaiting) return;
   input.value = '';
   addChatMessage('user', text);
+  CHAT.lastUserMessageTime = performance.now();
+
+  // Push user message to history before sending
+  CHAT.history.push({ role: 'user', content: text });
 
   CHAT.isWaiting = true;
   showTypingIndicator();
   var faceData = collectFaceData();
   var response = null;
 
+  // Always try Gemini when server connected — Gemini handles ALL questions naturally
+  // including "how are you", misspelled words, emotional situations, anything
   if (CHAT.serverOnline && CHAT.rateLimitedUntil <= performance.now()) {
     try {
       var res = await fetch(CHAT.SERVER_URL + '/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, faceData: faceData, history: CHAT.history.slice(-6) }),
-        signal: AbortSignal.timeout(15000),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          faceData: faceData,
+          // Send last 12 turns so Gemini remembers the full conversation
+          history: CHAT.history.slice(-12),
+        }),
+        signal: AbortSignal.timeout(20000),
       });
       var data = await res.json();
-      if (res.ok && !data.error) { response = data.response; }
-      else if (res.status === 429) { CHAT.rateLimitedUntil = performance.now() + 3600000; }
-    } catch (e) { /* silent fallback */ }
+      if (res.ok && data.response) {
+        response = data.response;
+      } else if (res.status === 429) {
+        CHAT.rateLimitedUntil = performance.now() + 3600000;
+        console.log('[chat] Quota exceeded, falling back to local');
+      }
+    } catch (e) {
+      console.warn('[chat] Server error:', e.message);
+    }
   }
 
-  if (!response) { response = AI.answer(text, faceData); }
+  // Local AI only when Gemini is truly unavailable
+  if (!response) {
+    response = AI.answer(text, faceData);
+  }
+
   removeTypingIndicator();
   addChatMessage('ai', response);
-  CHAT.history.push({ role: 'user', content: text });
   CHAT.history.push({ role: 'assistant', content: response });
-  if (CHAT.history.length > 14) CHAT.history.splice(0, 2);
+  // Keep last 20 messages in history for context
+  if (CHAT.history.length > 20) CHAT.history.splice(0, 2);
   CHAT.isWaiting = false;
 }
 
