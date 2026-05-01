@@ -1125,8 +1125,8 @@ var CHAT = {
   history:          [],      // conversation history for AI context
   isWaiting:        false,   // true while waiting for a response
   rateLimitedUntil: 0,
-  lastUserMessageTime: 0, — pause requests until this time
-  consecutiveErrors:0,       // track errors to back off automatically
+  lastUserMessageTime: 0,
+  consecutiveErrors: 0,
 };
 
 // ── SERVER HEALTH CHECK ─────────────────────────────────────
