@@ -1400,7 +1400,13 @@ var AI = {
       return "Focus struggles are almost never about willpower — they're usually about one of three things: mental overload, unclear priorities, or an environment fighting against you.\n\nI can see your current focus score is " + focus + "/100" + (bpm > 0 ? " and your blink rate is " + bpm + "/min." : ".") + "\n\nTell me more — when you try to focus, what actually happens? Does your mind wander to specific thoughts, do you get pulled to your phone, do you feel mentally foggy, or something else? The cause determines the fix.";
     }
 
-    if (q.match(/motivat|inspire|purpose|meaning|direction|lost|don'?t know what|stuck/)) {
+    // GRIEF - must come BEFORE motivation so "lost my mom/dad/sister" never hits wrong topic
+    if (q.match(/lost my (mom|mother|dad|father|sister|brother|son|daughter|wife|husband|partner|friend|pet|dog|cat|baby|child|grandma|grandpa|grandmother|grandfather)|passed away|she died|he died|they died|funeral|mourning|grieving|lost someone|death of/)) {
+      AI.lastTopic = 'grief';
+      return "I am so deeply sorry for your loss. Losing someone you love is one of the most painful experiences a person can go through — and there are no words that can make it better.\n\nI want you to know that I am here with you right now. You do not have to process this alone.\n\nCan you tell me about them? Or if you prefer, just tell me how you are feeling right now — whatever feels right.";
+    }
+
+    if (q.match(/motivat|inspire|purpose|meaning|direction|don'?t know what to do|stuck|no purpose/)) {
       AI.lastTopic = 'purpose';
       return "That feeling of being unmotivated or lost — it's more common than people admit, and it's often a signal, not a flaw.\n\nSometimes it means we've drifted from something that matters to us. Sometimes it means we're exhausted and our brain has nothing left for enthusiasm. Sometimes it means we need a new challenge.\n\nCan I ask: when was the last time you felt genuinely energised or excited about something? What were you doing? That memory is usually a clue.";
     }
@@ -1540,19 +1546,18 @@ async function sendChatMessage() {
   showTypingIndicator();
   var faceData = collectFaceData();
   var response = null;
+  var geminiError = null;
 
-  // Always try Gemini when server connected — Gemini handles ALL questions naturally
-  // including "how are you", misspelled words, emotional situations, anything
+  // Always try Gemini when server connected
   if (CHAT.serverOnline && CHAT.rateLimitedUntil <= performance.now()) {
     try {
       var res = await fetch(CHAT.SERVER_URL + '/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text,
+          message:  text,
           faceData: faceData,
-          // Send last 12 turns so Gemini remembers the full conversation
-          history: CHAT.history.slice(-12),
+          history:  CHAT.history.slice(-12),
         }),
         signal: AbortSignal.timeout(20000),
       });
@@ -1561,22 +1566,32 @@ async function sendChatMessage() {
         response = data.response;
       } else if (res.status === 429) {
         CHAT.rateLimitedUntil = performance.now() + 3600000;
-        console.log('[chat] Quota exceeded, falling back to local');
+        geminiError = 'quota';
+        console.warn('[Aria] Gemini quota exceeded - using local fallback');
+      } else if (data.error) {
+        geminiError = data.error;
+        console.warn('[Aria] Gemini error:', data.error);
       }
     } catch (e) {
-      console.warn('[chat] Server error:', e.message);
+      geminiError = e.message;
+      console.warn('[Aria] Fetch failed:', e.message);
+      // If server unreachable, mark offline so we stop trying
+      if (e.name === 'TypeError' || e.name === 'AbortError') {
+        CHAT.serverOnline = false;
+        updateServerStatus(false);
+      }
     }
   }
 
-  // Local AI only when Gemini is truly unavailable
+  // Local AI fallback - only when Gemini truly unavailable
   if (!response) {
+    console.log('[Aria] Using local fallback. Gemini error:', geminiError);
     response = AI.answer(text, faceData);
   }
 
   removeTypingIndicator();
   addChatMessage('ai', response);
   CHAT.history.push({ role: 'assistant', content: response });
-  // Keep last 20 messages in history for context
   if (CHAT.history.length > 20) CHAT.history.splice(0, 2);
   CHAT.isWaiting = false;
 }
