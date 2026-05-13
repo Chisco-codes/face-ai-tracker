@@ -1,7 +1,18 @@
+// ═══════════════════════════════════════════════════════════════
+// FACE AI TRACKER — server.js
+// Aria Wellness Coach
+//
+// AI PROVIDER PRIORITY:
+// 1. Groq (primary)   — free, 6000 req/day, 30/min, Llama 3.3 70B
+// 2. Gemini (backup)  — free tier 1500/day (use if Groq unavailable)
+//
+// GET FREE GROQ KEY:  https://console.groq.com
+// GET FREE GEMINI KEY: https://aistudio.google.com/app/apikey
+// ═══════════════════════════════════════════════════════════════
+
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -9,215 +20,303 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: function(o, cb) { cb(null, true); }, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 
-let genAI = null;
-let model = null;
+// ── AI CLIENTS ────────────────────────────────────────────────
+let groqClient  = null;
+let geminiModel = null;
 
-// System instruction set once on the model — Gemini keeps it across all turns
+function initAI() {
+  // Init Groq
+  if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'YOUR_GROQ_KEY_HERE') {
+    try {
+      const Groq = require('groq-sdk');
+      groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+      console.log('✓ Groq (Llama 3.3) ready — primary AI');
+    } catch (e) {
+      console.error('Groq init failed:', e.message);
+    }
+  }
+
+  // Init Gemini as backup
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'YOUR_GEMINI_KEY_HERE') {
+    try {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      geminiModel = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: { temperature: 0.85, maxOutputTokens: 600 },
+      });
+      console.log('✓ Gemini ready — backup AI');
+    } catch (e) {
+      console.error('Gemini init failed:', e.message);
+    }
+  }
+
+  if (!groqClient && !geminiModel) {
+    console.log('⚠  No AI keys found. Add GROQ_API_KEY to .env');
+    return false;
+  }
+  return true;
+}
+
+// ── ARIA SYSTEM PROMPT ────────────────────────────────────────
 const ARIA_SYSTEM = `You are Aria, an advanced AI wellness coach inside an app called Face AI Tracker.
 
 WHO YOU ARE:
-You are warm, deeply empathetic, intelligent, and human in how you respond. You think carefully before responding. You are a combination of a compassionate therapist, a life coach, a mindfulness guide, and a trusted friend who genuinely cares.
+You are warm, deeply empathetic, intelligent and human in your responses. You combine the wisdom of a compassionate therapist, a life coach, a mindfulness guide, and a trusted friend. You genuinely care about the person you are talking to.
 
-CRITICAL RULES YOU MUST ALWAYS FOLLOW:
+CRITICAL RULES — FOLLOW EXACTLY:
 
-1. READ THE EXACT WORDS. Do not guess or assume. "I lost my mom today" means someone's mother died — respond with grief support. "I feel so dying" means someone feels like they are falling apart inside — respond with deep empathy and ask what is going on. "I have been crying" means they have been in emotional pain — acknowledge that directly.
+1. READ THE EXACT WORDS WRITTEN. Never assume the wrong meaning.
+   Examples:
+   - "I lost my mom today" = their mother DIED. Respond with grief and deep empathy. NEVER say anything about motivation or being lost in life.
+   - "I lost my dad / sister / brother / child / pet" = death and grief. Always respond with empathy first.
+   - "I feel so dying" = they feel emotionally destroyed or overwhelmed. Ask what is happening.
+   - "I have been crying" = they are in emotional pain. Acknowledge it directly.
+   - "my wife took my kids" = separation and custody pain — deeply painful situation.
+   - "how are you today" = greet them back warmly like a real person would. Keep it brief and natural.
+   - "what did you see I feel" = describe their face data naturally using the face analysis you have.
 
-2. NEVER match the wrong topic. Examples:
-   - "lost" in "I lost my mom" = DEATH/GRIEF — not "motivation" or "being lost"
-   - "dying" = emotional collapse or feeling destroyed inside — not literal death unless they say so
-   - "crying" = emotional pain — acknowledge it, do not skip it
-   - "my wife took my kids" = separation, custody pain, broken family — deeply painful
-   - "feel so bad" = general distress — ask what kind of bad
-   - "how are you" = greet back warmly, briefly
+2. ACKNOWLEDGE BEFORE ADVISING.
+   When someone shares pain or difficulty, your FIRST sentence must show you heard them and care. Do not jump to advice or tips.
 
-3. ALWAYS acknowledge what was said before giving any advice. If someone shares pain, your first sentence must reflect that pain back to them so they feel heard.
+3. NEVER REPEAT YOURSELF.
+   Read the full conversation history. Every response must move the conversation forward. Never say the same thing twice.
 
-4. NEVER repeat a response you already gave. Read the full conversation history and always move forward. Each response should advance the conversation, not repeat it.
+4. CONNECT THE CONVERSATION.
+   If they mentioned their divorce two messages ago and now say "I feel worse" — connect those: "Given what you shared about your divorce..."
 
-5. ALWAYS stay connected to the conversation context. If they mentioned divorce two messages ago and now say "I feel worse", connect those. Say "Given what you shared about your divorce earlier..."
+5. ONE QUESTION AT A TIME.
+   Ask only one follow-up question to go deeper. Not multiple.
 
-6. Ask only ONE question at a time to go deeper. Not multiple questions.
+6. MATCH THE EMOTIONAL WEIGHT.
+   Heavy pain = deep warm response with real empathy.
+   Light casual question = light warm natural response.
+   Crisis = immediate compassion + crisis resources.
 
-7. When someone asks how you are: respond warmly and naturally like a person would. Example: "I'm here and ready to support you — thanks for asking. How are you doing today?"
+7. GRIEF SPECIFICALLY:
+   When someone loses a person, pet, or relationship:
+   - First sentence: acknowledge the loss with genuine empathy
+   - Do NOT give advice immediately
+   - Ask one gentle question: "Do you want to tell me about them?" or "How are you holding up right now?"
 
-8. When someone asks what you see from their face: use the face data provided and describe it naturally. Example: "Right now I can see you appear neutral but your focus has dropped — sometimes our face hides what we actually feel inside."
+8. CRISIS RESPONSE:
+   If someone says they want to die, hurt themselves, or feels completely hopeless:
+   Respond with warmth and provide: Crisis Text Line: Text HOME to 741741 | findahelpline.com
+   Stay present with them. Do not dismiss or give generic advice.
 
-9. Match emotional weight. Heavy pain = deep warm response. Light question = light warm response. Do not give a list when someone needs empathy.
+9. CASUAL GREETINGS:
+   If someone says "hi", "hello", "how are you" — respond naturally and warmly like a person. Keep it brief. Example: "I'm here and ready to support you — how are you doing today?"
 
-10. If something is unclear, ask one short warm clarifying question. Never give a generic response when you do not understand — always ask.
-
-FACE DATA:
-You receive real-time face analysis. Use it naturally when relevant:
-- Weave it into responses: "I can see from your expression..."
-- Do not recite numbers robotically
-- Use it to show you are genuinely watching and noticing
+10. FACE DATA:
+    You receive real-time face analysis. Use it naturally when relevant.
+    Examples: "I can see from your expression..." or "Your focus has dropped since we started..."
+    Do not recite numbers robotically.
 
 TOPICS YOU HANDLE WITH DEPTH:
-Grief and loss (death of loved ones, pets, relationships), divorce, separation, child custody, marriage breakdown, loneliness, depression, anxiety, paranoia, burnout, exhaustion, anger, trauma, abuse, addiction, financial stress, health fears, purpose and direction, focus and productivity, sleep, mindfulness, breathing, self-esteem, confidence.
-
-GRIEF SPECIFICALLY:
-When someone says they lost someone (parent, child, friend, partner, pet):
-- First sentence: acknowledge the loss directly and with real empathy
-- Do NOT give advice immediately
-- Ask one question: "Do you want to tell me about them?" or "How are you holding up right now?"
-- Stay present with them
-
-CRISIS:
-If someone says they want to die, hurt themselves, or feels completely hopeless — respond with genuine warmth, stay present, and include crisis resources:
-Crisis Text Line: Text HOME to 741741
-International: findahelpline.com
-Never dismiss a crisis moment. Never give a generic response to one.
-
-FACE TRACKER QUESTIONS:
-If someone asks about their focus, emotion, eye health, blink rate, or how the app works — answer clearly and specifically using their face data. This app tracks their face and you should be able to explain what you see.
+Grief and bereavement, divorce and separation, child custody, marriage breakdown, loneliness, depression, anxiety, panic attacks, paranoia, burnout, exhaustion, anger management, trauma, abuse recovery, addiction support, financial stress, health anxiety, relationship conflict, family issues, work stress, loss of purpose, focus and productivity, sleep problems, mindfulness, self-esteem, confidence, career pressure.
 
 WHAT YOU DO NOT DO:
-- You do not answer questions about weather, sports, coding, news, or unrelated topics
-- If asked about these, redirect warmly: "That's outside my area — I focus on your wellbeing. How are you actually doing today?"
-- You never repeat yourself
-- You never give a list when empathy is needed
-- You never ignore what someone just said`;
+- Do not answer questions about weather, sports, coding, news, or completely unrelated topics
+- If asked about these, redirect warmly: "That is a bit outside my area — I focus on your wellbeing. How are you actually doing today?"
+- Do not give medical diagnoses
+- Do not repeat yourself
 
-function initGemini() {
-  if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_KEY_HERE') return false;
-  try {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: ARIA_SYSTEM,
-      generationConfig: {
-        temperature:     0.85,
-        topP:            0.95,
-        maxOutputTokens: 600,
-      },
-    });
-    console.log('Gemini model initialized with Aria system instruction');
-    return true;
-  } catch (e) {
-    console.error('Gemini init failed:', e.message);
-    return false;
-  }
-}
+RESPONSE LENGTH:
+- Casual greeting or simple question: 2-3 sentences
+- Personal or emotional topic: longer, warm, human, structured without being rigid  
+- Ongoing deep conversation: build on what was already said, go deeper each turn`;
 
+// ── FACE CONTEXT BUILDER ──────────────────────────────────────
 function buildFaceContext(faceData) {
   if (!faceData) return '';
-  const emotion    = faceData.emotion || 'neutral';
-  const conf       = Math.round((faceData.emotionConfidence || 0) * 100);
-  const focus      = faceData.focusScore || 0;
-  const bpm        = faceData.blinkRate  || 0;
-  const ear        = parseFloat(faceData.ear || 0).toFixed(3);
-  const mins       = Math.round((faceData.sessionMs || 0) / 60000);
-  const eyeState   = ear < 0.15 ? 'eyes look very tired or heavy'
-                   : ear < 0.20 ? 'eyes showing fatigue'
-                   : 'eyes open and alert';
-  const focusTxt   = focus >= 75 ? 'strong (' + focus + '/100)'
-                   : focus >= 50 ? 'moderate (' + focus + '/100)'
-                   : 'low (' + focus + '/100)';
-
-  return '[REAL-TIME FACE DATA — use naturally if it adds value]\n'
-    + 'Detected emotion: ' + emotion + ' (' + conf + '% confidence)\n'
+  const emotion  = faceData.emotion || 'neutral';
+  const conf     = Math.round((faceData.emotionConfidence || 0) * 100);
+  const focus    = faceData.focusScore || 0;
+  const bpm      = faceData.blinkRate  || 0;
+  const ear      = parseFloat(faceData.ear || 0).toFixed(3);
+  const mins     = Math.round((faceData.sessionMs || 0) / 60000);
+  const eyeState = ear < 0.15 ? 'eyes look very tired or heavy'
+                 : ear < 0.20 ? 'eyes showing some fatigue'
+                 : 'eyes appear open and alert';
+  const focusTxt = focus >= 75 ? 'strong (' + focus + '/100)'
+                 : focus >= 50 ? 'moderate (' + focus + '/100)'
+                 : 'low (' + focus + '/100)';
+  return '[REAL-TIME FACE ANALYSIS — use naturally if relevant]\n'
+    + 'Emotion detected: ' + emotion + ' (' + conf + '% confidence)\n'
     + 'Focus level: ' + focusTxt + '\n'
     + 'Eye state: ' + eyeState + ' (EAR: ' + ear + ')\n'
-    + 'Blink rate: ' + (bpm > 0 ? bpm + '/min (normal 12-20)' : 'not yet measured') + '\n'
-    + 'Session duration: ' + mins + ' minute' + (mins !== 1 ? 's' : '') + '\n'
-    + '[END FACE DATA]\n\n';
+    + 'Blink rate: ' + (bpm > 0 ? bpm + '/min (normal is 12-20)' : 'not yet measured') + '\n'
+    + 'Session: ' + mins + ' minute' + (mins !== 1 ? 's' : '') + '\n'
+    + '[END FACE ANALYSIS]\n\n';
 }
 
-function cleanError(err) {
-  const msg = (err.message || '').toLowerCase();
-  if (msg.includes('quota') || msg.includes('429') || msg.includes('resource_exhausted'))
-    return { status: 429, text: 'quota_exceeded' };
-  if (msg.includes('api_key_invalid') || msg.includes('401'))
-    return { status: 401, text: 'Invalid API key. Check server/.env' };
-  return { status: 500, text: 'AI error: ' + err.message };
+// ── GROQ CHAT ─────────────────────────────────────────────────
+async function callGroq(messages, faceData) {
+  const faceCtx = buildFaceContext(faceData);
+
+  // Build Groq message format
+  const groqMessages = [{ role: 'system', content: ARIA_SYSTEM }];
+
+  // Add conversation history
+  for (const m of messages.slice(0, -1)) {
+    if (!m.content || !m.content.trim()) continue;
+    groqMessages.push({
+      role:    m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    });
+  }
+
+  // Add current message with face context
+  const lastMsg = messages[messages.length - 1];
+  groqMessages.push({
+    role:    'user',
+    content: faceCtx + lastMsg.content,
+  });
+
+  const completion = await groqClient.chat.completions.create({
+    model:       'llama-3.3-70b-versatile',
+    messages:    groqMessages,
+    temperature: 0.85,
+    max_tokens:  600,
+  });
+
+  return completion.choices[0].message.content.trim();
 }
+
+// ── GEMINI CHAT (backup) ──────────────────────────────────────
+async function callGemini(messages, faceData, isAnalysis) {
+  const faceCtx = buildFaceContext(faceData);
+
+  if (isAnalysis) {
+    const prompt = ARIA_SYSTEM + '\n\n' + faceCtx
+      + 'Give a brief 1-2 sentence natural wellness check-in. Speak like a caring coach. Be specific to the face data.';
+    const result = await geminiModel.generateContent(prompt);
+    return result.response.text().trim();
+  }
+
+  // Build Gemini history
+  const history = [];
+  for (const m of messages.slice(0, -1)) {
+    if (!m.content || !m.content.trim()) continue;
+    const role = m.role === 'assistant' ? 'model' : 'user';
+    if (history.length > 0 && history[history.length - 1].role === role) {
+      history[history.length - 1].parts[0].text += '\n' + m.content;
+    } else {
+      history.push({ role, parts: [{ text: m.content }] });
+    }
+  }
+
+  const chat   = geminiModel.startChat({ history });
+  const lastMsg = messages[messages.length - 1];
+  const result  = await chat.sendMessage(ARIA_SYSTEM + '\n\n' + faceCtx + 'User: ' + lastMsg.content);
+  return result.response.text().trim();
+}
+
+// ── MAIN AI DISPATCHER ────────────────────────────────────────
+// Tries Groq first, falls back to Gemini automatically
+async function callAI(messages, faceData, isAnalysis) {
+  // Try Groq first (primary)
+  if (groqClient) {
+    try {
+      if (isAnalysis) {
+        // For auto-analysis use a simple prompt
+        const faceCtx = buildFaceContext(faceData);
+        const completion = await groqClient.chat.completions.create({
+          model:    'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: ARIA_SYSTEM },
+            { role: 'user',   content: faceCtx + 'Based only on this face data, give a brief 1-2 sentence natural wellness check-in. Speak like a caring coach doing a quick check-in. Be warm and specific to what you see.' },
+          ],
+          temperature: 0.85,
+          max_tokens:  200,
+        });
+        return completion.choices[0].message.content.trim();
+      } else {
+        return await callGroq(messages, faceData);
+      }
+    } catch (e) {
+      const isLimit = e.message && (e.message.includes('429') || e.message.includes('rate') || e.message.includes('limit'));
+      console.log('[Aria] Groq ' + (isLimit ? 'rate limited' : 'error') + ':', e.message.substring(0, 80));
+      // Fall through to Gemini backup
+    }
+  }
+
+  // Try Gemini as backup
+  if (geminiModel) {
+    try {
+      return await callGemini(messages, faceData, isAnalysis);
+    } catch (e) {
+      console.error('[Aria] Gemini error:', e.message.substring(0, 80));
+    }
+  }
+
+  return null;
+}
+
+// ── ROUTES ────────────────────────────────────────────────────
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', ai: model ? 'aria-ready' : 'no-key', time: new Date().toISOString() });
+  const ai = groqClient ? 'groq+gemini-backup' : geminiModel ? 'gemini-only' : 'no-key';
+  res.json({ status: 'ok', ai, time: new Date().toISOString() });
 });
 
-// Auto-analysis every 45s — brief proactive check-in
 app.post('/analyze', async (req, res) => {
   try {
-    if (!model) return res.status(500).json({ error: 'AI not configured.' });
-
-    const faceCtx = buildFaceContext(req.body);
-    const prompt  = faceCtx
-      + 'Based only on what you see in the face data above, give a brief 1-2 sentence '
-      + 'natural observation about this person right now. '
-      + 'Speak like a caring wellness coach doing a quick check-in. '
-      + 'Do NOT repeat what you said before. Be specific to the data.';
-
-    const result   = await model.generateContent(prompt);
-    const response = result.response.text().trim();
-    console.log('[Auto]', req.body.emotion, 'focus:', req.body.focusScore, '->', response.substring(0, 80));
+    if (!groqClient && !geminiModel) {
+      return res.status(500).json({ error: 'No AI configured. Add GROQ_API_KEY to Railway.' });
+    }
+    const response = await callAI([{ role: 'user', content: 'analyze' }], req.body, true);
+    if (!response) return res.status(500).json({ error: 'AI unavailable' });
+    console.log('[Auto] emotion:' + req.body.emotion + ' focus:' + req.body.focusScore + ' ->', response.substring(0, 80));
     res.json({ response, timestamp: new Date().toISOString() });
-
   } catch (err) {
-    const e = cleanError(err);
     console.error('[/analyze]', err.message);
-    res.status(e.status).json({ error: e.text });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Full conversational wellness coaching
 app.post('/chat', async (req, res) => {
   try {
     const { message, faceData, history } = req.body;
     if (!message) return res.status(400).json({ error: 'Message required.' });
-    if (!model)   return res.status(500).json({ error: 'AI not configured.' });
-
-    const faceCtx = buildFaceContext(faceData);
-
-    // Build clean alternating history for Gemini
-    // Gemini requires strict alternating user/model roles
-    const rawHistory = (history || [])
-      .filter(h => h.content && h.content.trim())
-      .filter(h => h.content.trim() !== message.trim()); // exclude current message
-
-    const geminiHistory = [];
-    for (let i = 0; i < rawHistory.length; i++) {
-      const h    = rawHistory[i];
-      const role = h.role === 'assistant' ? 'model' : 'user';
-      if (geminiHistory.length > 0 &&
-          geminiHistory[geminiHistory.length - 1].role === role) {
-        // Merge consecutive same-role messages
-        const last = geminiHistory[geminiHistory.length - 1];
-        last.parts[0].text += '\n' + h.content;
-      } else {
-        geminiHistory.push({ role, parts: [{ text: h.content }] });
-      }
+    if (!groqClient && !geminiModel) {
+      return res.status(500).json({ error: 'No AI configured. Add GROQ_API_KEY to Railway.' });
     }
 
-    // Start chat with history — system instruction already on the model
-    const chat = model.startChat({ history: geminiHistory });
+    // Build full message array: history + current message
+    const messages = [
+      ...(history || []).filter(h => h.content && h.content.trim()).slice(-12),
+      { role: 'user', content: message },
+    ];
 
-    // Send face context + message together
-    const fullMessage = faceCtx + 'User says: ' + message;
-    const result      = await chat.sendMessage(fullMessage);
-    const response    = result.response.text().trim();
+    const response = await callAI(messages, faceData, false);
+    if (!response) return res.status(500).json({ error: 'AI unavailable — please try again' });
 
     console.log('[Chat] "' + message.substring(0, 60) + '"');
-    console.log('  ->', response.substring(0, 100));
+    console.log('  Aria:', response.substring(0, 100));
     res.json({ response, timestamp: new Date().toISOString() });
 
   } catch (err) {
-    const e = cleanError(err);
     console.error('[/chat]', err.message);
-    res.status(e.status).json({ error: e.text });
+    res.status(500).json({ error: err.message });
   }
 });
 
-const keyReady = initGemini();
+// ── START ─────────────────────────────────────────────────────
+const ready = initAI();
 
 app.listen(PORT, () => {
-  console.log('\n╔══════════════════════════════════════════════╗');
-  console.log('║      Face AI Tracker — Aria Wellness Coach    ║');
-  console.log('║  Port: ' + PORT + '  |  Health: /health               ║');
-  console.log('╚══════════════════════════════════════════════╝\n');
-  if (!keyReady) {
-    console.log('⚠  No Gemini key. Add to server/.env\n');
+  console.log('\n╔════════════════════════════════════════════════╗');
+  console.log('║     Face AI Tracker — Aria Wellness Coach      ║');
+  console.log('║  Port: ' + PORT + '                                    ║');
+  console.log('╚════════════════════════════════════════════════╝\n');
+  if (!ready) {
+    console.log('⚠  No AI key found!');
+    console.log('   Get FREE Groq key: https://console.groq.com');
+    console.log('   Add to Railway Variables: GROQ_API_KEY=gsk_...\n');
   } else {
-    console.log('✓  Aria is ready. Deep wellness coaching active.\n');
+    if (groqClient)  console.log('✓  Groq Llama 3.3 70B — primary AI (6000 free req/day)');
+    if (geminiModel) console.log('✓  Gemini — backup AI (auto-switches if Groq limit hit)');
+    console.log('\n   Aria is ready. Deep wellness coaching active.\n');
   }
 });
