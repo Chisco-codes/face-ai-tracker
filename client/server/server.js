@@ -121,7 +121,7 @@ async function callGroq(userMessage, faceData, history, isAnalysis) {
   if (isAnalysis) {
     messages.push({
       role:    'user',
-      content: faceCtx + 'Based on this face data, give a brief 1-2 sentence warm wellness check-in. Speak like a caring coach. Be specific and natural.',
+      content: faceCtx + 'One brief sentence about what you observe. Be warm and specific.',
     });
   } else {
     messages.push({
@@ -134,7 +134,7 @@ async function callGroq(userMessage, faceData, history, isAnalysis) {
     model:       'llama-3.3-70b-versatile',
     messages,
     temperature: 0.85,
-    max_tokens:  isAnalysis ? 150 : 600,
+    max_tokens:  isAnalysis ? 60 : 400,
   });
 
   return completion.choices[0].message.content.trim();

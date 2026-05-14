@@ -1117,7 +1117,7 @@ async function init() {
 
 var CHAT = {
   SERVER_URL:       'https://face-ai-tracker-production.up.railway.app',
-  AUTO_INTERVAL_MS: 45000,   // auto-analyze every 45 seconds
+  AUTO_INTERVAL_MS: 120000,  // auto-analyze every 2 minutes (saves tokens)
                              // Gemini free tier: 15 req/min, 1500/day
                              // 45s = max ~80 requests/hour — safe and generous
   serverOnline:     false,
