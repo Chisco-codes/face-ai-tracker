@@ -131,7 +131,7 @@ async function callGroq(userMessage, faceData, history, isAnalysis) {
   }
 
   const completion = await groq.chat.completions.create({
-    model:       'llama-3.3-70b-versatile',
+    model:       'llama-3.1-8b-instant',
     messages,
     temperature: 0.85,
     max_tokens:  isAnalysis ? 60 : 400,
@@ -146,7 +146,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     ai:     groq ? 'aria-ready' : 'no-key',
-    model:  'llama-3.3-70b-versatile',
+    model:  'llama-3.1-8b-instant',
     time:   new Date().toISOString(),
   });
 });
