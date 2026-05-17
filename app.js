@@ -1536,6 +1536,8 @@ async function sendChatMessage() {
   var text = input.value.trim();
   if (!text || CHAT.isWaiting) return;
   input.value = '';
+  input.style.height = 'auto';
+  input.style.overflowY = 'hidden';
   addChatMessage('user', text);
   CHAT.lastUserMessageTime = performance.now();
 
@@ -1596,14 +1598,26 @@ async function sendChatMessage() {
   CHAT.isWaiting = false;
 }
 
-// Enter key to send
+// Enter key to send (Shift+Enter for new line)
 document.addEventListener('DOMContentLoaded', function() {
   var input = document.getElementById('chat-input');
   if (input) {
+    // Auto-expand textarea as user types
+    input.addEventListener('input', function() {
+      this.style.height = 'auto';
+      var newHeight = Math.min(this.scrollHeight, 160);
+      this.style.height = newHeight + 'px';
+      this.style.overflowY = this.scrollHeight > 160 ? 'auto' : 'hidden';
+    });
+
+    // Enter sends, Shift+Enter adds new line
     input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendChatMessage();
+        // Reset height after sending
+        this.style.height = 'auto';
+        this.style.overflowY = 'hidden';
       }
     });
   }

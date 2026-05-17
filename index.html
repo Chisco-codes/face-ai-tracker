@@ -285,13 +285,13 @@
 
         <!-- Manual message input -->
         <div class="chat-input-row">
-          <input
-            type="text"
+          <textarea
             id="chat-input"
             class="chat-input"
             placeholder="Talk to Aria... e.g. I feel overwhelmed today"
-            maxlength="200"
-          />
+            maxlength="2000"
+            rows="1"
+          ></textarea>
           <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>

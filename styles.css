@@ -841,23 +841,30 @@ canvas#overlay-canvas {
 
 /* Input row */
 .chat-input-row {
-  display:  flex;
-  gap:      8px;
+  display:     flex;
+  gap:         8px;
   padding-top: 4px;
+  align-items: flex-end;
 }
 
 .chat-input {
   flex:          1;
-  padding:       9px 12px;
+  padding:       10px 14px;
   background:    var(--surface-2);
   border:        1px solid var(--border);
   border-radius: var(--radius-sm);
   color:         var(--text);
   font-family:   var(--font);
-  font-size:     16px; /* MUST be 16px+ on iOS to prevent auto-zoom */
+  font-size:     16px;
   outline:       none;
   transition:    border-color var(--transition);
-  /* Prevent iOS from rounding the corners differently */
+  resize:        none;
+  overflow-y:    hidden;
+  min-height:    42px;
+  max-height:    160px;
+  line-height:   1.5;
+  display:       block;
+  width:         100%;
   -webkit-appearance: none;
 }
 .chat-input:focus        { border-color: var(--accent); }
