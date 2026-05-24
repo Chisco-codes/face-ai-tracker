@@ -6,7 +6,18 @@ const Groq    = require('groq-sdk');
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: function(o, cb) { cb(null, true); }, credentials: true }));
+app.use(cors({ origin: '*', credentials: false }));
+
+// Extra safety — manually set CORS headers on every response
+app.use(function(req, res, next) {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 app.use(express.json({ limit: '10mb' }));
 
 // ── GROQ CLIENT ───────────────────────────────────────────────

@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: face-ai-tracker
+    runtime: node
+    rootDir: client/server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

@@ -1116,7 +1116,7 @@ async function init() {
 // ═══════════════════════════════════════════════════════════════
 
 var CHAT = {
-  SERVER_URL:       'https://face-ai-tracker-production.up.railway.app',
+  SERVER_URL:       'https://face-ai-tracker.onrender.com',
   AUTO_INTERVAL_MS: 120000,  // auto-analyze every 2 minutes (saves tokens)
                              // Gemini free tier: 15 req/min, 1500/day
                              // 45s = max ~80 requests/hour — safe and generous
@@ -1135,18 +1135,21 @@ async function checkServer() {
   try {
     var res = await fetch(CHAT.SERVER_URL + '/health', {
       method: 'GET',
-      signal: AbortSignal.timeout(3000),
+      // Render free tier can take up to 30s to wake from sleep
+      signal: AbortSignal.timeout(35000),
     });
     if (res.ok) {
       CHAT.serverOnline = true;
       updateServerStatus(true);
+      updateChatStatusText('Server connected');
       return true;
     }
   } catch (e) {
-    // Server not running
+    // Server sleeping or unreachable
   }
   CHAT.serverOnline = false;
   updateServerStatus(false);
+  updateChatStatusText('Server offline — run: node server.js');
   return false;
 }
 
