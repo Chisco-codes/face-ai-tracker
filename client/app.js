@@ -1088,16 +1088,15 @@ async function init() {
 // ═══════════════════════════════════════════════════════════════
 
 var CHAT = {
-  SERVER_URL:       'http://localhost:3001',
-  AUTO_INTERVAL_MS: 45000,   // auto-analyze every 45 seconds
-                             // Gemini free tier: 15 req/min, 1500/day
-                             // 45s = max ~80 requests/hour — safe and generous
+  SERVER_URL:       'https://face-ai-tracker.onrender.com',
+  AUTO_INTERVAL_MS: 120000,
   serverOnline:     false,
   autoTimer:        null,
-  history:          [],      // conversation history for AI context
-  isWaiting:        false,   // true while waiting for a response
-  rateLimitedUntil: 0,       // timestamp — pause requests until this time
-  consecutiveErrors:0,       // track errors to back off automatically
+  history:          [],
+  isWaiting:        false,
+  rateLimitedUntil: 0,
+  lastUserMessageTime: 0,
+  consecutiveErrors:   0,
 };
 
 // ── SERVER HEALTH CHECK ─────────────────────────────────────
