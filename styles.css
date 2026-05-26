@@ -956,20 +956,14 @@ canvas#overlay-canvas {
   .metric-grid { gap: 6px; }
   .chat-messages { max-height: 200px; }
 
-  /* On mobile use a taller aspect ratio so the face fills more of the frame
-     object-fit: contain means no cropping — dots always land on the face */
-  .video-wrapper {
-    aspect-ratio: 3 / 4;
-  }
+  /* Video portrait ratio on mobile */
+  .video-wrapper { aspect-ratio: 3 / 4; }
 
   /* Feedback banner smaller on mobile */
-  .feedback-banner {
-    padding: 10px 12px;
-    min-height: 44px;
-  }
+  .feedback-banner { padding: 10px 12px; min-height: 44px; }
   .feedback-text { font-size: 0.82rem; }
 
-  /* Video overlay stats — smaller pill on mobile */
+  /* Video overlay stats smaller on mobile */
   .vos-item { padding: 5px 10px; }
   .vos-value { font-size: 0.78rem; }
   .vos-label { font-size: 0.58rem; }
@@ -978,6 +972,48 @@ canvas#overlay-canvas {
 @media (max-width: 360px) {
   .brand-version { display: none; }
   .video-overlay-stats { display: none !important; }
+}
+
+/* Performance hints — tell browser what will animate
+   so it can prepare GPU layers and not compete with scroll */
+canvas#overlay-canvas {
+  will-change: transform;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+video#webcam {
+  will-change: transform;
+  -webkit-transform: translateZ(0) scaleX(-1);
+  transform: translateZ(0) scaleX(-1);
+}
+
+/* Prevent scroll jumping when typing in chat input on mobile */
+.chat-card {
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-messages {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Mobile install button — make it more visible and tappable */
+@media (max-width: 600px) {
+  .install-card {
+    position:  fixed;
+    bottom:    16px;
+    left:      16px;
+    right:     16px;
+    z-index:   200;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    margin:    0;
+  }
+
+  .install-btn-main {
+    padding:   14px;
+    font-size: 1rem;
+  }
 }
 
 

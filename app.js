@@ -160,10 +160,12 @@ var STATE = {
   headTiltAngle:    0,
   headNodAngle:     0,
 
-  // Canvas scaling — ratio of pixel size to CSS display size
-  // Used to position landmark dots correctly on mobile
+  // Canvas scaling
   scaleX: 1,
   scaleY: 1,
+
+  // Mobile throttle — track last detection time
+  lastDetectionTime: 0,
 };
 
 
@@ -724,6 +726,19 @@ async function detectionLoop() {
   if (!STATE.isRunning) return;
   var now = performance.now();
 
+  // Throttle on mobile — run at max 20fps instead of 60fps
+  // This prevents the detection loop from competing with
+  // scrolling and typing on mobile devices
+  var isMobile = window.innerWidth <= 480 ||
+                 /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var minFrameMs = isMobile ? 50 : 16; // 20fps mobile, 60fps desktop
+
+  if (now - STATE.lastDetectionTime < minFrameMs) {
+    STATE.animFrameId = requestAnimationFrame(detectionLoop);
+    return;
+  }
+  STATE.lastDetectionTime = now;
+
   try {
     if (DOM.video.readyState < 2 || DOM.video.videoWidth === 0) {
       STATE.animFrameId = requestAnimationFrame(detectionLoop);
@@ -735,31 +750,24 @@ async function detectionLoop() {
       DOM.canvas.height = DOM.video.videoHeight;
     }
 
-    // Calculate scale ratio between canvas pixel size and CSS display size.
-    // On mobile the canvas may be 480px wide in pixels but 320px wide on screen.
-    // Keypoints come back in pixel space so we scale them to display space
-    // when drawing so dots land exactly on the face as seen on screen.
     var displayW = DOM.canvas.offsetWidth  || DOM.canvas.width;
     var displayH = DOM.canvas.offsetHeight || DOM.canvas.height;
     STATE.scaleX = DOM.canvas.width  / displayW;
     STATE.scaleY = DOM.canvas.height / displayH;
 
-    // ── Face mesh detection (every frame) ──────────────────
+    // Face mesh detection
     var faces = await STATE.meshModel.estimateFaces(DOM.video, { flipHorizontal: false });
     CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
 
     if (faces && faces.length > 0 &&
         faces[0].keypoints && faces[0].keypoints.length > 0) {
-
       var pts = faces[0].keypoints;
       drawAllDots(pts);
       drawEyeDots(pts);
       drawBox(faces[0].box);
-
       var m = computeMetrics(pts);
       updatePanel(true, pts.length);
       updateMetrics(m);
-
     } else {
       updatePanel(false, 0);
       if (!STATE.calibrating && DOM.feedbackText) {
@@ -767,9 +775,7 @@ async function detectionLoop() {
       }
     }
 
-    // ── Emotion detection (every N frames) ─────────────────
-    // We run this separately from mesh detection because it
-    // operates on the raw video, not on landmarks.
+    // Emotion detection every N frames
     STATE.framesSinceEmotion++;
     if (STATE.framesSinceEmotion >= CONFIG.EMOTION_EVERY_N_FRAMES &&
         !STATE.calibrating && STATE.emotionModelReady) {
@@ -1691,6 +1697,21 @@ var originalDetectionLoop = detectionLoop;
 setTimeout(checkServer, 1000);
 // Re-check every 30 seconds
 setInterval(checkServer, 30000);
+
+// ── KEEP-ALIVE PING ──────────────────────────────────────────
+// Pings the server every 14 minutes to prevent Render free tier
+// from putting the server to sleep after 15 minutes of inactivity.
+// This costs zero tokens — it only hits the /health endpoint.
+setInterval(function() {
+  fetch(CHAT.SERVER_URL + '/health', {
+    method: 'GET',
+    signal: AbortSignal.timeout(10000),
+  }).then(function() {
+    console.log('[Keep-alive] Server pinged successfully');
+  }).catch(function() {
+    console.log('[Keep-alive] Server did not respond — will retry');
+  });
+}, 14 * 60 * 1000); // every 14 minutes
 
 init();
 
