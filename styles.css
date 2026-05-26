@@ -974,18 +974,13 @@ canvas#overlay-canvas {
   .video-overlay-stats { display: none !important; }
 }
 
-/* Performance hints — tell browser what will animate
-   so it can prepare GPU layers and not compete with scroll */
+/* Performance hints for smooth rendering */
 canvas#overlay-canvas {
-  will-change: transform;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+  will-change: contents;
 }
 
 video#webcam {
-  will-change: transform;
-  -webkit-transform: translateZ(0) scaleX(-1);
-  transform: translateZ(0) scaleX(-1);
+  will-change: auto;
 }
 
 /* Prevent scroll jumping when typing in chat input on mobile */
@@ -998,21 +993,21 @@ video#webcam {
   overscroll-behavior: contain;
 }
 
-/* Mobile install button — make it more visible and tappable */
+/* Mobile install button — clean card at bottom of panels, not floating */
 @media (max-width: 600px) {
   .install-card {
-    position:  fixed;
-    bottom:    16px;
-    left:      16px;
-    right:     16px;
-    z-index:   200;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    position:  relative;
+    bottom:    auto;
+    left:      auto;
+    right:     auto;
+    z-index:   1;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
     margin:    0;
   }
 
   .install-btn-main {
-    padding:   14px;
-    font-size: 1rem;
+    padding:   13px;
+    font-size: 0.95rem;
   }
 }
 
