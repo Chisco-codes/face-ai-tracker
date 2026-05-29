@@ -1,90 +1,128 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
-const Groq    = require('groq-sdk');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: '*', credentials: false }));
-
-// Extra safety — manually set CORS headers on every response
 app.use(function(req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
   next();
 });
 app.use(express.json({ limit: '10mb' }));
 
-// ── GROQ CLIENT ───────────────────────────────────────────────
-let groq = null;
+// ── AI CLIENTS ────────────────────────────────────────────────
+let openaiClient = null;
+let groqClient   = null;
 
-function initGroq() {
-  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'YOUR_GROQ_KEY_HERE') {
-    console.log('⚠  No GROQ_API_KEY found. Add it to Railway Variables.');
+function initAI() {
+  // Init OpenAI (primary)
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'YOUR_OPENAI_KEY_HERE') {
+    try {
+      const OpenAI = require('openai');
+      openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      console.log('✓  OpenAI GPT-4o ready — primary AI');
+    } catch (e) {
+      console.error('OpenAI init failed:', e.message);
+    }
+  }
+
+  // Init Groq (backup)
+  if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'YOUR_GROQ_KEY_HERE') {
+    try {
+      const Groq = require('groq-sdk');
+      groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+      console.log('✓  Groq Llama 3.1 ready — backup AI');
+    } catch (e) {
+      console.error('Groq init failed:', e.message);
+    }
+  }
+
+  if (!openaiClient && !groqClient) {
+    console.log('⚠  No AI keys found. Add OPENAI_API_KEY to environment variables.');
     return false;
   }
-  try {
-    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    console.log('✓  Groq (Llama 3.3 70B) ready');
-    return true;
-  } catch (e) {
-    console.error('Groq init failed:', e.message);
-    return false;
-  }
+  return true;
 }
 
 // ── ARIA SYSTEM PROMPT ────────────────────────────────────────
 const ARIA_SYSTEM = `You are Aria, an advanced AI wellness coach inside an app called Face AI Tracker.
 
 WHO YOU ARE:
-You are warm, deeply empathetic, intelligent and human in your responses. You are a combination of a compassionate therapist, a life coach, a mindfulness guide, and a trusted friend who genuinely cares about the person talking to you.
+You are warm, deeply empathetic, intelligent and genuinely human in your responses. You combine the wisdom of a compassionate therapist, life coach, mindfulness guide, and trusted friend. You truly care about the person you are talking to.
 
-CRITICAL RULES — FOLLOW EVERY SINGLE ONE:
+CRITICAL RULES — FOLLOW EVERY ONE PRECISELY:
 
-1. READ THE EXACT WORDS. Never assume the wrong topic.
-   - "I lost my mom / dad / sister / brother / child / pet" = DEATH AND GRIEF. Respond with deep empathy. NEVER talk about motivation or being lost in life.
-   - "I feel so dying" = they feel emotionally destroyed. Ask what is happening with genuine care.
-   - "I have been crying" = emotional pain. Acknowledge it directly and warmly.
-   - "my wife/husband took my kids" = separation and custody pain. Deeply painful. Acknowledge it.
-   - "how are you" = respond naturally like a person. Warm and brief.
-   - "what did you see I feel" = describe their face analysis data naturally.
+1. READ EXACT WORDS. Never misinterpret meaning.
+   - "I lost my mom/dad/sister/brother/child/partner/pet" = DEATH AND GRIEF. Respond with deep empathy. NEVER mention motivation or being lost in life.
+   - "I feel so dying" = emotional collapse, feeling destroyed inside. Ask what is happening with genuine care.
+   - "I have been crying" = emotional pain. Acknowledge it directly and warmly first.
+   - "my wife/husband took my kids" = separation and custody pain. Devastating. Acknowledge specifically.
+   - "how are you" = respond naturally like a warm person would. Brief and genuine.
+   - "what did you see / how do I look" = describe their face data naturally using the analysis provided.
 
-2. ACKNOWLEDGE BEFORE ADVISING. When someone shares pain, your FIRST sentence must show you heard them. Never jump straight to advice or tips.
+2. ACKNOWLEDGE BEFORE ADVISING. When someone shares pain, your FIRST sentence must reflect that you heard and feel for them. Never jump to tips or advice.
 
-3. NEVER REPEAT YOURSELF. Read the full conversation. Every response must move forward and add something new.
+3. NEVER REPEAT YOURSELF. Read the full conversation history carefully. Every single response must move the conversation forward with something new. Never say the same thing twice.
 
-4. CONNECT THE CONVERSATION. If they mentioned divorce earlier and now say "I feel worse" — link it: "Given what you shared about your divorce..."
+4. BUILD ON CONVERSATION. If they mentioned divorce earlier and now say "I feel worse" — connect it: "Given what you shared about your divorce earlier, this makes complete sense..."
 
-5. ONE QUESTION AT A TIME. Ask only one follow-up question to go deeper.
+5. ONE QUESTION AT A TIME. Ask only one follow-up question to go deeper. Never multiple questions.
 
-6. MATCH EMOTIONAL WEIGHT. Heavy pain needs deep warm response. Light question needs light natural response. Never give a list when someone needs empathy.
+6. MATCH EMOTIONAL WEIGHT PRECISELY.
+   - Someone sharing deep grief or trauma = long, warm, deeply empathetic response
+   - Casual greeting = short, natural, warm
+   - Crisis = immediate compassion + crisis resources
+   - Question about the app = clear, helpful explanation
 
-7. GRIEF: When someone loses a person, pet, or relationship — acknowledge the loss with real empathy first. Do not give advice immediately. Ask gently: "Do you want to tell me about them?" or "How are you holding up right now?"
+7. GRIEF AND LOSS — Special handling:
+   When someone loses a person, pet, or relationship:
+   - First sentence must acknowledge the loss with genuine empathy
+   - Do NOT give advice or tips immediately
+   - Ask one gentle question: "Do you want to tell me about them?" or "How are you holding up right now?"
+   - Stay present. Do not rush to fix their pain.
 
-8. CRISIS: If someone mentions wanting to die or hurt themselves — respond with warmth and give: Crisis Text Line: Text HOME to 741741 | findahelpline.com. Stay present with them.
+8. CRISIS RESPONSE:
+   If someone expresses suicidal thoughts, self-harm, or complete hopelessness:
+   Respond with warmth, stay present, and include:
+   Crisis Text Line: Text HOME to 741741
+   International: findahelpline.com
+   Never give generic advice in a crisis moment.
 
-9. GREETINGS: Respond naturally like a person would. Brief and warm. Example: "I am here and ready to support you. How are you doing today?"
+9. CASUAL AND GREETING MESSAGES:
+   Respond like a warm, real person. Brief and natural.
+   Example for "how are you": "I am here and genuinely glad you came. How are you doing today?"
 
-10. FACE DATA: You receive real-time face analysis. Use it naturally when relevant. Do not recite numbers robotically. Say things like: "I can see from your expression that you look tense right now..."
+10. FACE DATA — use naturally:
+    You receive real-time facial analysis. Weave it into responses naturally when it adds value.
+    Good: "I can see from your expression that you look tense right now..."
+    Bad: "Your EAR is 0.215 and focus score is 67"
 
-TOPICS YOU HANDLE WITH REAL DEPTH:
-Grief and bereavement, divorce, separation, child custody, marriage problems, loneliness, depression, anxiety, paranoia, panic attacks, burnout, exhaustion, anger, trauma, abuse, addiction recovery, financial stress, health anxiety, relationship conflict, family issues, work stress, loss of purpose, focus problems, sleep issues, mindfulness, self-esteem, confidence, career pressure.
+11. VARIETY — Never start consecutive responses the same way. Vary your openings, tone, and structure.
 
-FOR TOPICS OUTSIDE WELLNESS:
-If someone asks about weather, sports, coding or unrelated topics, redirect warmly: "That is outside my area — I focus on your wellbeing. How are you actually doing today?"
+12. DEPTH — In an ongoing conversation, go deeper each turn. Ask the right question. Uncover what is really going on.
 
-RESPONSE LENGTH:
-- Greeting or simple question: 2-3 sentences maximum
-- Personal or emotional topic: longer, warm, human, structured
-- Ongoing conversation: build on what was already said, go deeper each turn
-- Never give a bullet point list when someone needs human warmth`;
+TOPICS YOU HANDLE WITH GENUINE DEPTH:
+Grief and bereavement, divorce, separation, child custody, marriage breakdown, loneliness, depression, anxiety, panic attacks, paranoia, burnout, exhaustion, anger, trauma, abuse recovery, addiction, financial stress, health anxiety, relationship conflict, family issues, work stress, loss of purpose, focus and productivity, sleep problems, mindfulness, breathing, self-esteem, confidence, career pressure, existential questions.
 
-// ── FACE CONTEXT BUILDER ──────────────────────────────────────
+WHAT YOU DO NOT DO:
+- Answer questions about weather, sports, coding, or completely unrelated topics
+- Redirect warmly: "That is a bit outside my area — I focus entirely on your wellbeing. How are you actually doing today?"
+- Give medical diagnoses
+- Repeat yourself
+- Give a list when someone needs human warmth
+
+RESPONSE LENGTH GUIDE:
+- Greeting or simple question: 2-3 sentences
+- Personal or emotional topic: longer, warm, human, naturally structured
+- Ongoing deep conversation: build meaningfully on what was already said
+- Never use bullet points when someone needs empathy`;
+
+// ── FACE CONTEXT ──────────────────────────────────────────────
 function buildFaceContext(faceData) {
   if (!faceData) return '';
   const emotion  = faceData.emotion || 'neutral';
@@ -105,45 +143,76 @@ function buildFaceContext(faceData) {
     + 'Focus level: ' + focusLvl + '\n'
     + 'Eye state: ' + eyeState + ' (EAR: ' + ear + ')\n'
     + 'Blink rate: ' + (bpm > 0 ? bpm + '/min (normal 12-20)' : 'not yet measured') + '\n'
-    + 'Session duration: ' + mins + ' minute' + (mins !== 1 ? 's' : '') + '\n'
+    + 'Session: ' + mins + ' minute' + (mins !== 1 ? 's' : '') + '\n'
     + '[END FACE ANALYSIS]\n\n';
 }
 
-// ── CALL GROQ ─────────────────────────────────────────────────
-async function callGroq(userMessage, faceData, history, isAnalysis) {
+// ── CALL OPENAI ───────────────────────────────────────────────
+async function callOpenAI(messages, faceData, isAnalysis) {
   const faceCtx = buildFaceContext(faceData);
 
-  const messages = [{ role: 'system', content: ARIA_SYSTEM }];
-
-  if (!isAnalysis && history && history.length > 0) {
-    const cleanHistory = history
-      .filter(h => h.content && h.content.trim())
-      .filter(h => h.content.trim() !== userMessage.trim())
-      .slice(-12);
-
-    for (const h of cleanHistory) {
-      messages.push({
-        role:    h.role === 'assistant' ? 'assistant' : 'user',
-        content: h.content,
-      });
-    }
-  }
+  const openaiMessages = [{ role: 'system', content: ARIA_SYSTEM }];
 
   if (isAnalysis) {
-    messages.push({
+    openaiMessages.push({
       role:    'user',
-      content: faceCtx + 'One brief sentence about what you observe. Be warm and specific.',
+      content: faceCtx + 'Based on this face data, give one brief warm sentence as a wellness check-in. Be specific and natural. Do not repeat previous observations.',
     });
   } else {
-    messages.push({
+    // Add conversation history
+    for (const m of messages.slice(0, -1)) {
+      if (!m.content || !m.content.trim()) continue;
+      openaiMessages.push({
+        role:    m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      });
+    }
+    // Add current message with face context
+    const lastMsg = messages[messages.length - 1];
+    openaiMessages.push({
       role:    'user',
-      content: faceCtx + userMessage,
+      content: faceCtx + lastMsg.content,
     });
   }
 
-  const completion = await groq.chat.completions.create({
+  const completion = await openaiClient.chat.completions.create({
+    model:       'gpt-4o-mini', // cost-effective, excellent quality
+    messages:    openaiMessages,
+    temperature: 0.85,
+    max_tokens:  isAnalysis ? 80 : 500,
+  });
+
+  return completion.choices[0].message.content.trim();
+}
+
+// ── CALL GROQ (backup) ────────────────────────────────────────
+async function callGroq(messages, faceData, isAnalysis) {
+  const faceCtx = buildFaceContext(faceData);
+  const groqMessages = [{ role: 'system', content: ARIA_SYSTEM }];
+
+  if (isAnalysis) {
+    groqMessages.push({
+      role:    'user',
+      content: faceCtx + 'One brief warm sentence wellness check-in based on face data.',
+    });
+  } else {
+    for (const m of messages.slice(0, -1)) {
+      if (!m.content || !m.content.trim()) continue;
+      groqMessages.push({
+        role:    m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      });
+    }
+    const lastMsg = messages[messages.length - 1];
+    groqMessages.push({
+      role:    'user',
+      content: faceCtx + lastMsg.content,
+    });
+  }
+
+  const completion = await groqClient.chat.completions.create({
     model:       'llama-3.1-8b-instant',
-    messages,
+    messages:    groqMessages,
     temperature: 0.85,
     max_tokens:  isAnalysis ? 60 : 400,
   });
@@ -151,25 +220,50 @@ async function callGroq(userMessage, faceData, history, isAnalysis) {
   return completion.choices[0].message.content.trim();
 }
 
-// ── ROUTES ────────────────────────────────────────────────────
+// ── MAIN AI DISPATCHER ────────────────────────────────────────
+async function callAI(messages, faceData, isAnalysis) {
+  // Try OpenAI first (primary — best quality)
+  if (openaiClient) {
+    try {
+      const response = await callOpenAI(messages, faceData, isAnalysis);
+      return { response, provider: 'openai' };
+    } catch (e) {
+      const isQuota = e.status === 429 || (e.message && e.message.includes('quota'));
+      console.log('[Aria] OpenAI ' + (isQuota ? 'quota/rate limit' : 'error') + ': ' + e.message.substring(0, 60));
+    }
+  }
 
+  // Fall back to Groq
+  if (groqClient) {
+    try {
+      const response = await callGroq(messages, faceData, isAnalysis);
+      return { response, provider: 'groq' };
+    } catch (e) {
+      console.error('[Aria] Groq error:', e.message.substring(0, 60));
+    }
+  }
+
+  return null;
+}
+
+// ── ROUTES ────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    ai:     groq ? 'aria-ready' : 'no-key',
-    model:  'llama-3.1-8b-instant',
-    time:   new Date().toISOString(),
-  });
+  const provider = openaiClient ? 'gpt-4o-mini+groq-backup' : groqClient ? 'groq-only' : 'no-key';
+  res.json({ status: 'ok', ai: 'aria-ready', provider, time: new Date().toISOString() });
 });
 
 app.post('/analyze', async (req, res) => {
   try {
-    if (!groq) return res.status(500).json({ error: 'AI not configured. Add GROQ_API_KEY to Railway.' });
-    const response = await callGroq('analyze', req.body, [], true);
-    console.log('[Auto] ' + req.body.emotion + ' focus:' + req.body.focusScore + ' -> ' + response.substring(0, 80));
-    res.json({ response, timestamp: new Date().toISOString() });
+    if (!openaiClient && !groqClient)
+      return res.status(500).json({ error: 'No AI configured.' });
+
+    const result = await callAI([{ role: 'user', content: 'analyze' }], req.body, true);
+    if (!result) return res.status(500).json({ error: 'AI unavailable' });
+
+    console.log('[Auto][' + result.provider + '] ' + req.body.emotion + ' focus:' + req.body.focusScore);
+    res.json({ response: result.response, timestamp: new Date().toISOString() });
   } catch (err) {
-    console.error('[/analyze error]', err.message);
+    console.error('[/analyze]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -178,29 +272,37 @@ app.post('/chat', async (req, res) => {
   try {
     const { message, faceData, history } = req.body;
     if (!message) return res.status(400).json({ error: 'Message required.' });
-    if (!groq)    return res.status(500).json({ error: 'AI not configured. Add GROQ_API_KEY to Railway.' });
+    if (!openaiClient && !groqClient)
+      return res.status(500).json({ error: 'No AI configured.' });
 
-    const response = await callGroq(message, faceData, history || [], false);
-    console.log('[Chat] "' + message.substring(0, 60) + '"');
-    console.log('  Aria: ' + response.substring(0, 100));
-    res.json({ response, timestamp: new Date().toISOString() });
+    const messages = [
+      ...(history || []).filter(h => h.content && h.content.trim()).slice(-12),
+      { role: 'user', content: message },
+    ];
 
+    const result = await callAI(messages, faceData, false);
+    if (!result) return res.status(500).json({ error: 'AI unavailable — please try again' });
+
+    console.log('[Chat][' + result.provider + '] "' + message.substring(0, 50) + '"');
+    console.log('  Aria:', result.response.substring(0, 100));
+    res.json({ response: result.response, timestamp: new Date().toISOString() });
   } catch (err) {
-    console.error('[/chat error]', err.message);
+    console.error('[/chat]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ── START ─────────────────────────────────────────────────────
-const ready = initGroq();
+const ready = initAI();
 
 app.listen(PORT, () => {
-  console.log('\n╔══════════════════════════════════════════════════╗');
-  console.log('║      Face AI Tracker — Aria Wellness Coach        ║');
-  console.log('║  AI: Groq Llama 3.3 70B  |  Port: ' + PORT + '            ║');
-  console.log('╚══════════════════════════════════════════════════╝\n');
+  console.log('\n╔════════════════════════════════════════════════════╗');
+  console.log('║       Face AI Tracker — Aria Wellness Coach         ║');
+  console.log('║  Primary: GPT-4o-mini  |  Backup: Groq Llama 3.1   ║');
+  console.log('╚════════════════════════════════════════════════════╝\n');
   if (ready) {
-    console.log('✓  Aria is ready. 6000 free requests per day.');
-    console.log('✓  Deep wellness coaching active.\n');
+    console.log('✓  Aria is ready. Deep wellness coaching active.\n');
+  } else {
+    console.log('⚠  Add OPENAI_API_KEY to environment variables.\n');
   }
 });
