@@ -25,7 +25,7 @@ function initAI() {
     try {
       const OpenAI = require('openai');
       openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      console.log('✓  OpenAI GPT-4o ready — primary AI');
+      console.log('✓  OpenAI GPT-4o-mini ready — primary AI');
     } catch (e) {
       console.error('OpenAI init failed:', e.message);
     }
@@ -97,14 +97,22 @@ CRITICAL RULES — FOLLOW EVERY ONE PRECISELY:
    Respond like a warm, real person. Brief and natural.
    Example for "how are you": "I am here and genuinely glad you came. How are you doing today?"
 
-10. FACE DATA — use naturally:
-    You receive real-time facial analysis. Weave it into responses naturally when it adds value.
+10. FACE DATA — use naturally and ONLY when meaningful:
+    You may receive real-time facial analysis. Use it ONLY when it adds genuine value.
+    Do NOT mention face data in every message. Do NOT repeat the same observation twice.
+    If the person is asking a direct question — answer the question first.
+    Only weave in face data when it genuinely adds to the conversation.
     Good: "I can see from your expression that you look tense right now..."
-    Bad: "Your EAR is 0.215 and focus score is 67"
+    Bad: Mentioning fatigue or eyes in every single response regardless of context.
 
 11. VARIETY — Never start consecutive responses the same way. Vary your openings, tone, and structure.
 
 12. DEPTH — In an ongoing conversation, go deeper each turn. Ask the right question. Uncover what is really going on.
+
+13. DIRECT QUESTIONS GET DIRECT ANSWERS.
+    If someone asks what you are capable of — tell them clearly and concisely.
+    If someone asks you to explain yourself — do it naturally without mentioning their face.
+    Face data does not belong in every response. Read the context first.
 
 TOPICS YOU HANDLE WITH GENUINE DEPTH:
 Grief and bereavement, divorce, separation, child custody, marriage breakdown, loneliness, depression, anxiety, panic attacks, paranoia, burnout, exhaustion, anger, trauma, abuse recovery, addiction, financial stress, health anxiety, relationship conflict, family issues, work stress, loss of purpose, focus and productivity, sleep problems, mindfulness, breathing, self-esteem, confidence, career pressure, existential questions.
@@ -115,6 +123,7 @@ WHAT YOU DO NOT DO:
 - Give medical diagnoses
 - Repeat yourself
 - Give a list when someone needs human warmth
+- Mention fatigue or eyes when someone is asking a direct unrelated question
 
 RESPONSE LENGTH GUIDE:
 - Greeting or simple question: 2-3 sentences
@@ -125,10 +134,17 @@ RESPONSE LENGTH GUIDE:
 // ── FACE CONTEXT ──────────────────────────────────────────────
 function buildFaceContext(faceData) {
   if (!faceData) return '';
-  const emotion  = faceData.emotion || 'neutral';
+
+  const emotion = faceData.emotion  || 'neutral';
+  const focus   = faceData.focusScore || 0;
+
+  // FIX 2: Only inject face context when something meaningful is detected.
+  // Neutral emotion with normal focus = nothing worth mentioning.
+  // This stops Aria obsessing over fatigue when nothing is actually wrong.
+  if (emotion === 'neutral' && focus >= 50) return '';
+
   const conf     = Math.round((faceData.emotionConfidence || 0) * 100);
-  const focus    = faceData.focusScore || 0;
-  const bpm      = faceData.blinkRate  || 0;
+  const bpm      = faceData.blinkRate || 0;
   const ear      = parseFloat(faceData.ear || 0).toFixed(3);
   const mins     = Math.round((faceData.sessionMs || 0) / 60000);
   const eyeState = ear < 0.15 ? 'eyes look very tired or heavy'
@@ -138,13 +154,13 @@ function buildFaceContext(faceData) {
                  : focus >= 50 ? 'moderate (' + focus + '/100)'
                  : 'low (' + focus + '/100)';
 
-  return '[REAL-TIME FACE ANALYSIS — use naturally if relevant]\n'
+  return '[REAL-TIME FACE ANALYSIS — use naturally ONLY if relevant to conversation]\n'
     + 'Detected emotion: ' + emotion + ' (' + conf + '% confidence)\n'
     + 'Focus level: ' + focusLvl + '\n'
     + 'Eye state: ' + eyeState + ' (EAR: ' + ear + ')\n'
     + 'Blink rate: ' + (bpm > 0 ? bpm + '/min (normal 12-20)' : 'not yet measured') + '\n'
     + 'Session: ' + mins + ' minute' + (mins !== 1 ? 's' : '') + '\n'
-    + '[END FACE ANALYSIS]\n\n';
+    + '[END FACE ANALYSIS — do NOT mention this in every message]\n\n';
 }
 
 // ── CALL OPENAI ───────────────────────────────────────────────
@@ -167,7 +183,7 @@ async function callOpenAI(messages, faceData, isAnalysis) {
         content: m.content,
       });
     }
-    // Add current message with face context
+    // Add current message with face context only if meaningful
     const lastMsg = messages[messages.length - 1];
     openaiMessages.push({
       role:    'user',
@@ -176,7 +192,7 @@ async function callOpenAI(messages, faceData, isAnalysis) {
   }
 
   const completion = await openaiClient.chat.completions.create({
-    model:       'gpt-4o-mini', // cost-effective, excellent quality
+    model:       'gpt-4o-mini',
     messages:    openaiMessages,
     temperature: 0.85,
     max_tokens:  isAnalysis ? 80 : 500,
@@ -252,10 +268,28 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', ai: 'aria-ready', provider, time: new Date().toISOString() });
 });
 
+// FIX 1: Cooldown tracker — prevents Aria from auto-firing more than
+// once every 10 minutes per session. Kills the repetitive loop.
+const analyzeCooldowns  = new Map();
+const ANALYZE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
 app.post('/analyze', async (req, res) => {
   try {
     if (!openaiClient && !groqClient)
       return res.status(500).json({ error: 'No AI configured.' });
+
+    // Use sessionId from body if provided, else fall back to IP
+    const sessionId = req.body.sessionId || req.ip || 'default';
+    const lastTime  = analyzeCooldowns.get(sessionId) || 0;
+    const now       = Date.now();
+
+    // Still within cooldown window — return silent null, no AI call made
+    if (now - lastTime < ANALYZE_COOLDOWN_MS) {
+      return res.json({ response: null, skipped: true });
+    }
+
+    // Outside cooldown — update timestamp and proceed
+    analyzeCooldowns.set(sessionId, now);
 
     const result = await callAI([{ role: 'user', content: 'analyze' }], req.body, true);
     if (!result) return res.status(500).json({ error: 'AI unavailable' });
