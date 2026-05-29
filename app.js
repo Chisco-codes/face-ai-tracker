@@ -47,7 +47,7 @@ var CONFIG = {
   BLINK_DROP:        0.055,  // EAR must drop this far below baseline
   EAR_FLOOR:         0.10,
   EAR_FALLBACK:      0.13,
-  BLINK_FRAMES:      3,
+  BLINK_FRAMES:      4,
 
   // Calibration
   CALIB_DURATION_MS: 4000,
@@ -63,7 +63,7 @@ var CONFIG = {
   W_EMOTION:         0.15,  // emotion now contributes to focus score
 
   NORMAL_BPM:        16,
-  SMOOTH:            0.88,
+  SMOOTH:            0.92,
 
   // Emotion detection
   // Run emotion detection every N frames
@@ -79,11 +79,11 @@ var CONFIG = {
   // Temporal voting window — how many readings to average
   // before committing to an emotion. Higher = more stable.
   // 8 readings at every-3-frames = ~0.8 seconds of data
-  EMOTION_VOTE_WINDOW: 8,
+  EMOTION_VOTE_WINDOW: 12,
 
   // Minimum vote share (0-1) to confirm an emotion change
   // 0.45 = emotion must win 45% of recent frames
-  EMOTION_VOTE_THRESHOLD: 0.45,
+  EMOTION_VOTE_THRESHOLD: 0.60,
 };
 
 
@@ -411,7 +411,7 @@ function smoothEmotions(newExpressions) {
 
   // Only add to vote history if confidence is meaningful
   // (above 30% prevents low-confidence noise polluting the vote)
-  if (frameMax > 0.30) {
+  if (frameMax > 0.45) {
     STATE.emotionVoteHistory.push(frameWinner);
   } else {
     // Low confidence frame — push 'neutral' as a stabiliser
@@ -503,19 +503,22 @@ function computeMetrics(keypoints) {
   }
 
   // Blink state machine
-  var thr = STATE.earThreshold;
-  if (ear < thr) {
-    STATE.blinkFrameCount++;
-    if (STATE.blinkState === 'OPEN') STATE.blinkState = 'CLOSING';
-    if (STATE.blinkState === 'CLOSING' && STATE.blinkFrameCount >= CONFIG.BLINK_FRAMES) {
-      STATE.blinkState = 'CLOSED';
-    }
-  } else {
-    if (STATE.blinkState === 'CLOSED') STATE.blinkTotal++;
-    STATE.blinkState      = 'OPEN';
-    STATE.blinkFrameCount = 0;
+ if (ear < thr) {
+  STATE.blinkFrameCount++;
+  if (STATE.blinkState === 'OPEN' && STATE.blinkFrameCount >= 2) {
+    STATE.blinkState = 'CLOSING';
   }
-
+  if (STATE.blinkState === 'CLOSING' && STATE.blinkFrameCount >= CONFIG.BLINK_FRAMES) {
+    STATE.blinkState = 'CLOSED';
+  }
+} else {
+  if (STATE.blinkState === 'CLOSED' || 
+     (STATE.blinkState === 'CLOSING' && STATE.blinkFrameCount >= CONFIG.BLINK_FRAMES)) {
+    STATE.blinkTotal++;
+  }
+  STATE.blinkState      = 'OPEN';
+  STATE.blinkFrameCount = 0;
+}
   // BPM
   var elapsedMs  = now - STATE.sessionStart;
   var elapsedMin = elapsedMs / 60000;
@@ -1714,6 +1717,26 @@ setInterval(function() {
 }, 14 * 60 * 1000); // every 14 minutes
 
 init();
+
+// ── VISIBILITY HANDLER ────────────────────────────────────────
+// Restarts camera stream if user switches apps or screen dims
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && STATE.isRunning) {
+    // Check if video stream is still alive
+    if (!DOM.video.srcObject || 
+        DOM.video.srcObject.getTracks().every(function(t) { 
+          return t.readyState === 'ended'; 
+        })) {
+      console.log('[Visibility] Stream died — restarting camera...');
+      startCamera().then(function(ok) {
+        if (ok) {
+          console.log('[Visibility] Camera restarted successfully');
+          setStatus('Detection running — look at the camera!', 'running');
+        }
+      });
+    }
+  }
+});
 
 // ── SERVICE WORKER REGISTRATION ─────────────────────────────
 // Registers the PWA service worker which enables:
