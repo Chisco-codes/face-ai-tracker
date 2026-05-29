@@ -263,6 +263,17 @@ async function callAI(messages, faceData, isAnalysis) {
 }
 
 // ── ROUTES ────────────────────────────────────────────────────
+// ── SERVE FRONTEND ────────────────────────────────────────────
+const path = require('path');
+
+// Serve the main app
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../index.html'));
+});
+
+// Serve all static files (css, js, icons, screenshots)
+app.use(express.static(path.join(__dirname, '../../')));
+
 app.get('/health', (req, res) => {
   const provider = openaiClient ? 'gpt-4o-mini+groq-backup' : groqClient ? 'groq-only' : 'no-key';
   res.json({ status: 'ok', ai: 'aria-ready', provider, time: new Date().toISOString() });
