@@ -1743,6 +1743,232 @@ document.addEventListener('visibilitychange', function() {
 // - Offline use after first visit
 // - Fast loading from cache
 // - "Install app" prompt on mobile and desktop
+// ── KEYBOARD SCROLL FIX ──────────────────────────────────────
+// When chat input is focused on mobile, scroll it into view
+// smoothly so it is always visible above the keyboard.
+// This fixes the "screen balancing / swiping" issue on Android and iOS.
+(function() {
+  var chatInput = document.getElementById('chat-input');
+  if (!chatInput) return;
+
+  chatInput.addEventListener('focus', function() {
+    // Small delay lets the keyboard fully open first
+    setTimeout(function() {
+      chatInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 350);
+  });
+
+  // On iOS — prevent the whole page from scrolling to top
+  // when input loses focus (common iOS bug)
+  chatInput.addEventListener('blur', function() {
+    setTimeout(function() {
+      window.scrollTo({ top: window.scrollY, behavior: 'instant' });
+    }, 100);
+  });
+})();
+
+
+// ── EXIT FEEDBACK SYSTEM ─────────────────────────────────────
+// Shows a feedback modal when:
+// 1. User tries to close/leave the tab (beforeunload)
+// 2. User switches away from the app (visibilitychange) after
+//    at least 60 seconds of session time
+// Feedback is stored locally and sent to server when available.
+
+var FEEDBACK = {
+  shown:        false,
+  selectedStar: 0,
+  minSessionMs: 60000, // Only show after 1 minute of use
+};
+
+function buildFeedbackModal() {
+  // Don't build twice
+  if (document.getElementById('feedback-modal-overlay')) return;
+
+  var overlay = document.createElement('div');
+  overlay.id        = 'feedback-modal-overlay';
+  overlay.className = 'feedback-modal-overlay';
+
+  overlay.innerHTML = `
+    <div class="feedback-modal" id="feedback-modal">
+      <div id="feedback-form-content">
+        <div class="feedback-modal-title">Before you go — how was your experience?</div>
+        <div class="feedback-modal-sub">Your feedback helps make Aria better for everyone.</div>
+
+        <div class="feedback-stars" id="feedback-stars">
+          <span class="feedback-star" data-value="1">⭐</span>
+          <span class="feedback-star" data-value="2">⭐</span>
+          <span class="feedback-star" data-value="3">⭐</span>
+          <span class="feedback-star" data-value="4">⭐</span>
+          <span class="feedback-star" data-value="5">⭐</span>
+        </div>
+
+        <textarea
+          class="feedback-textarea"
+          id="feedback-text-input"
+          placeholder="Anything specific? (optional)"
+          maxlength="500"
+        ></textarea>
+
+        <div class="feedback-modal-actions">
+          <button class="feedback-btn-submit" onclick="submitFeedback()">Send Feedback</button>
+          <button class="feedback-btn-skip"   onclick="closeFeedbackModal()">Skip</button>
+        </div>
+      </div>
+
+      <div id="feedback-thankyou" class="feedback-thankyou" style="display:none;">
+        <span class="feedback-thankyou-emoji">🙏</span>
+        <div class="feedback-thankyou-text">Thank you, Desmond!</div>
+        <div class="feedback-thankyou-sub">Your feedback means a lot. See you soon.</div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Star selection
+  var stars = overlay.querySelectorAll('.feedback-star');
+  stars.forEach(function(star) {
+    star.addEventListener('click', function() {
+      FEEDBACK.selectedStar = parseInt(star.getAttribute('data-value'));
+      stars.forEach(function(s, i) {
+        s.classList.toggle('selected', i < FEEDBACK.selectedStar);
+      });
+    });
+
+    // Hover preview
+    star.addEventListener('mouseenter', function() {
+      var val = parseInt(star.getAttribute('data-value'));
+      stars.forEach(function(s, i) {
+        s.style.opacity = i < val ? '1' : '0.4';
+      });
+    });
+  });
+
+  overlay.querySelector('.feedback-stars').addEventListener('mouseleave', function() {
+    stars.forEach(function(s, i) {
+      s.style.opacity = i < FEEDBACK.selectedStar ? '1' : '0.4';
+    });
+  });
+
+  // Close on overlay click (outside modal)
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeFeedbackModal();
+  });
+}
+
+function showFeedbackModal() {
+  if (FEEDBACK.shown) return;
+
+  // Only show if session ran long enough to be meaningful
+  var sessionMs = STATE.sessionStart
+    ? performance.now() - STATE.sessionStart
+    : 0;
+
+  if (sessionMs < FEEDBACK.minSessionMs && !STATE.isRunning) {
+    // Short session and not running — skip
+    return;
+  }
+
+  buildFeedbackModal();
+  FEEDBACK.shown = true;
+
+  requestAnimationFrame(function() {
+    var overlay = document.getElementById('feedback-modal-overlay');
+    if (overlay) overlay.classList.add('visible');
+  });
+}
+
+function closeFeedbackModal() {
+  var overlay = document.getElementById('feedback-modal-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('visible');
+  setTimeout(function() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }, 300);
+}
+
+function submitFeedback() {
+  var rating = FEEDBACK.selectedStar;
+  var text   = (document.getElementById('feedback-text-input') || {}).value || '';
+
+  // Show thank you
+  var form    = document.getElementById('feedback-form-content');
+  var thanks  = document.getElementById('feedback-thankyou');
+  if (form)   form.style.display   = 'none';
+  if (thanks) thanks.style.display = 'block';
+
+  // Store locally
+  var entry = {
+    rating:    rating,
+    text:      text.trim(),
+    timestamp: new Date().toISOString(),
+    session:   Math.round((performance.now() - (STATE.sessionStart || 0)) / 1000) + 's',
+  };
+
+  try {
+    var existing = JSON.parse(localStorage.getItem('aria-feedback') || '[]');
+    existing.push(entry);
+    // Keep last 20 feedback entries
+    if (existing.length > 20) existing = existing.slice(-20);
+    localStorage.setItem('aria-feedback', JSON.stringify(existing));
+  } catch(e) {}
+
+  // Try to send to server if online
+  if (CHAT.serverOnline && rating > 0) {
+    fetch(CHAT.SERVER_URL + '/feedback', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(entry),
+    }).catch(function() {
+      // Silent fail — feedback is already saved locally
+    });
+  }
+
+  // Auto-close after 2 seconds
+  setTimeout(closeFeedbackModal, 2000);
+}
+
+// Show feedback when user switches away (after meaningful session)
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden' && STATE.isRunning) {
+    var sessionMs = STATE.sessionStart
+      ? performance.now() - STATE.sessionStart
+      : 0;
+    if (sessionMs >= FEEDBACK.minSessionMs) {
+      showFeedbackModal();
+    }
+  }
+
+  // Camera restart on return (from previous visibility handler)
+  if (document.visibilityState === 'visible' && STATE.isRunning) {
+    if (!DOM.video.srcObject ||
+        DOM.video.srcObject.getTracks().every(function(t) {
+          return t.readyState === 'ended';
+        })) {
+      startCamera().then(function(ok) {
+        if (ok) setStatus('Detection running — look at the camera!', 'running');
+      });
+    }
+  }
+});
+
+// Show feedback on page unload (tab close / navigate away)
+window.addEventListener('beforeunload', function() {
+  if (!FEEDBACK.shown) {
+    var sessionMs = STATE.sessionStart
+      ? performance.now() - STATE.sessionStart
+      : 0;
+    if (sessionMs >= FEEDBACK.minSessionMs) {
+      // Store intent — can't show modal on beforeunload on most browsers
+      // but we can log it
+      try {
+        localStorage.setItem('aria-session-end', new Date().toISOString());
+      } catch(e) {}
+    }
+  }
+});
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js')

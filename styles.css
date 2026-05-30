@@ -1134,3 +1134,219 @@ input, textarea, select {
   flex-shrink:     0;
   margin-top:      1px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE KEYBOARD FIX
+   Prevents screen jumping when chat input is focused on mobile.
+   Uses dvh (dynamic viewport height) which accounts for
+   the browser chrome and keyboard appearing/disappearing.
+═══════════════════════════════════════════════════════════ */
+
+html, body {
+  height: 100%;
+}
+
+/* Use dynamic viewport height so keyboard open/close
+   does not cause layout shift */
+@supports (height: 100dvh) {
+  body {
+    min-height: 100dvh;
+  }
+}
+
+/* When chat input is focused on mobile — scroll it into view
+   smoothly and prevent the whole page from jumping */
+.chat-input:focus {
+  border-color: var(--accent);
+  /* Keeps the input visible above keyboard on iOS */
+  scroll-margin-bottom: 20px;
+}
+
+/* Prevent the chat card from being pushed off screen
+   when keyboard opens — let it scroll naturally */
+.chat-card {
+  -webkit-overflow-scrolling: touch;
+  /* Contain scroll within chat card */
+  scroll-behavior: smooth;
+}
+
+/* Stabilize the input row — stops it from bouncing
+   when keyboard appears on Android */
+.chat-input-row {
+  position: relative;
+  z-index:  2;
+  /* Prevent layout recalculation from causing visual jump */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Fix for iOS Safari viewport resize on keyboard open */
+@media screen and (max-height: 500px) {
+  .chat-messages {
+    max-height: 120px;
+  }
+  .topnav {
+    position: relative;
+  }
+  .dashboard {
+    padding-top: 1rem;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   EXIT FEEDBACK MODAL
+   Shown when user is about to leave the app.
+   Clean, non-intrusive, feels like a real product.
+═══════════════════════════════════════════════════════════ */
+
+.feedback-modal-overlay {
+  position:        fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:      rgba(10, 12, 18, 0.85);
+  backdrop-filter: blur(8px);
+  z-index:         999;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  padding:         1.5rem;
+  opacity:         0;
+  pointer-events:  none;
+  transition:      opacity 0.25s ease;
+}
+
+.feedback-modal-overlay.visible {
+  opacity:        1;
+  pointer-events: all;
+}
+
+.feedback-modal {
+  background:    var(--surface);
+  border:        1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding:       1.75rem;
+  max-width:     400px;
+  width:         100%;
+  transform:     translateY(16px);
+  transition:    transform 0.25s ease;
+}
+
+.feedback-modal-overlay.visible .feedback-modal {
+  transform: translateY(0);
+}
+
+.feedback-modal-title {
+  font-size:   1rem;
+  font-weight: 700;
+  color:       var(--text);
+  margin-bottom: 6px;
+}
+
+.feedback-modal-sub {
+  font-size:    0.82rem;
+  color:        var(--text-2);
+  margin-bottom: 1.25rem;
+  line-height:  1.5;
+}
+
+.feedback-stars {
+  display:         flex;
+  gap:             10px;
+  justify-content: center;
+  margin-bottom:   1.25rem;
+}
+
+.feedback-star {
+  font-size:  2rem;
+  cursor:     pointer;
+  opacity:    0.4;
+  transition: opacity 0.15s, transform 0.15s;
+  user-select:none;
+  -webkit-user-select: none;
+}
+
+.feedback-star:hover,
+.feedback-star.selected {
+  opacity:   1;
+  transform: scale(1.2);
+}
+
+.feedback-textarea {
+  width:         100%;
+  padding:       10px 14px;
+  background:    var(--surface-2);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color:         var(--text);
+  font-family:   var(--font);
+  font-size:     0.85rem;
+  resize:        none;
+  outline:       none;
+  min-height:    80px;
+  line-height:   1.5;
+  margin-bottom: 1rem;
+  transition:    border-color 0.2s;
+}
+
+.feedback-textarea:focus       { border-color: var(--accent); }
+.feedback-textarea::placeholder { color: var(--text-3); }
+
+.feedback-modal-actions {
+  display: flex;
+  gap:     10px;
+}
+
+.feedback-btn-submit {
+  flex:          1;
+  padding:       11px;
+  background:    var(--accent);
+  color:         var(--bg);
+  border:        none;
+  border-radius: var(--radius-sm);
+  font-family:   var(--font);
+  font-size:     0.875rem;
+  font-weight:   700;
+  cursor:        pointer;
+  transition:    opacity 0.2s;
+}
+.feedback-btn-submit:hover { opacity: 0.85; }
+
+.feedback-btn-skip {
+  padding:       11px 18px;
+  background:    transparent;
+  color:         var(--text-2);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family:   var(--font);
+  font-size:     0.875rem;
+  cursor:        pointer;
+  transition:    border-color 0.2s, color 0.2s;
+}
+.feedback-btn-skip:hover {
+  border-color: var(--border-2);
+  color:        var(--text);
+}
+
+/* Thank you state after submission */
+.feedback-thankyou {
+  text-align:  center;
+  padding:     1rem 0 0.5rem;
+}
+
+.feedback-thankyou-emoji {
+  font-size:     2.5rem;
+  display:       block;
+  margin-bottom: 10px;
+}
+
+.feedback-thankyou-text {
+  font-size:  0.95rem;
+  font-weight:700;
+  color:      var(--text);
+  margin-bottom: 6px;
+}
+
+.feedback-thankyou-sub {
+  font-size: 0.8rem;
+  color:     var(--text-2);
+}
