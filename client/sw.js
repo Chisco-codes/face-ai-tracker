@@ -9,7 +9,7 @@
 // 4. AI models: cached after first download (~5MB total)
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME    = 'face-ai-tracker-v1';
+const CACHE_NAME    = 'face-ai-tracker-v3';
 const CACHE_TIMEOUT = 5000; // 5 second network timeout
 
 // Files to cache on install
