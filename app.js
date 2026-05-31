@@ -1636,17 +1636,16 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ── CHAT UI HELPERS ─────────────────────────────────────────
-
 function addChatMessage(role, text) {
   var container = document.getElementById('chat-messages');
   if (!container) return;
-
+ 
   var div = document.createElement('div');
   div.className = 'chat-msg chat-msg--' + role;
-
-  var now = new Date();
+ 
+  var now  = new Date();
   var time = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
-
+ 
   if (role === 'ai') {
     div.innerHTML =
       '<div class="chat-avatar">AI</div>' +
@@ -1659,9 +1658,22 @@ function addChatMessage(role, text) {
   } else {
     div.innerHTML = '<p>' + text + '</p>';
   }
-
+ 
   container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
+ 
+  // Android fix: double RAF + timeout ensures DOM finishes
+  // rendering the new bubble before scrolling to it.
+  // Plain scrollTop = scrollHeight fails on Android when
+  // keyboard is open because height is calculated too early.
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      setTimeout(function() {
+        container.scrollTop = container.scrollHeight;
+        // Force scroll on stubborn Android browsers
+        div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 60);
+    });
+  });
 }
 
 function showTypingIndicator() {
@@ -1719,24 +1731,28 @@ setInterval(function() {
 init();
 
 // ── VISIBILITY HANDLER ────────────────────────────────────────
-// Restarts camera stream if user switches apps or screen dims
+// Restarts camera stream if user switches apps or screen dims 
 document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') {
+    var sessionMs = STATE.sessionStart
+      ? performance.now() - STATE.sessionStart
+      : 0;
+    if (sessionMs >= 60000 && !FEEDBACK.shown) {
+      showFeedbackModal();
+    }
+  }
   if (document.visibilityState === 'visible' && STATE.isRunning) {
-    // Check if video stream is still alive
-    if (!DOM.video.srcObject || 
-        DOM.video.srcObject.getTracks().every(function(t) { 
-          return t.readyState === 'ended'; 
+    if (!DOM.video.srcObject ||
+        DOM.video.srcObject.getTracks().every(function(t) {
+          return t.readyState === 'ended';
         })) {
-      console.log('[Visibility] Stream died — restarting camera...');
       startCamera().then(function(ok) {
-        if (ok) {
-          console.log('[Visibility] Camera restarted successfully');
-          setStatus('Detection running — look at the camera!', 'running');
-        }
+        if (ok) setStatus('Detection running — look at the camera!', 'running');
       });
     }
   }
 });
+ 
 
 // ── SERVICE WORKER REGISTRATION ─────────────────────────────
 // Registers the PWA service worker which enables:
@@ -1928,30 +1944,6 @@ function submitFeedback() {
   // Auto-close after 2 seconds
   setTimeout(closeFeedbackModal, 2000);
 }
-
-// Show feedback when user switches away (after meaningful session)
-document.addEventListener('visibilitychange', function() {
-  if (document.visibilityState === 'hidden' && STATE.isRunning) {
-    var sessionMs = STATE.sessionStart
-      ? performance.now() - STATE.sessionStart
-      : 0;
-    if (sessionMs >= FEEDBACK.minSessionMs) {
-      showFeedbackModal();
-    }
-  }
-
-  // Camera restart on return (from previous visibility handler)
-  if (document.visibilityState === 'visible' && STATE.isRunning) {
-    if (!DOM.video.srcObject ||
-        DOM.video.srcObject.getTracks().every(function(t) {
-          return t.readyState === 'ended';
-        })) {
-      startCamera().then(function(ok) {
-        if (ok) setStatus('Detection running — look at the camera!', 'running');
-      });
-    }
-  }
-});
 
 // Show feedback on page unload (tab close / navigate away)
 window.addEventListener('beforeunload', function() {

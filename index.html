@@ -9,10 +9,30 @@
   <link rel="manifest" href="manifest.json"/>
 
   <!-- iOS PWA support -->
+   <!-- iOS PWA — full support for Add to Home Screen -->
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="FaceAI"/>
-  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+ 
+  <!-- iOS icons — multiple sizes so every iPhone/iPad gets the right one -->
+  <link rel="apple-touch-icon" href="icons/icon-152.png"/>
+  <link rel="apple-touch-icon" sizes="72x72"   href="icons/icon-72.png"/>
+  <link rel="apple-touch-icon" sizes="96x96"   href="icons/icon-96.png"/>
+  <link rel="apple-touch-icon" sizes="128x128" href="icons/icon-128.png"/>
+  <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144.png"/>
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png"/>
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png"/>
+ 
+  <!-- iOS splash screens — stops the white flash on launch -->
+  <!-- These use the background colour of the app -->
+  <meta name="msapplication-TileColor" content="#0a0c12"/>
+  <meta name="msapplication-TileImage" content="icons/icon-144.png"/>
+ 
+  <!-- Prevent iOS from detecting phone numbers as links -->
+  <meta name="format-detection" content="telephone=no"/>
+ 
+  <!-- Makes the app feel native when launched from home screen -->
+  <meta name="mobile-web-app-capable" content="yes"/>
 
   <!-- Theme colour — matches the app accent colour -->
   <meta name="theme-color" content="#00e5ff"/>
@@ -274,7 +294,7 @@
         </div>
 
         <!-- Auto-analysis toggle -->
-        <div class="chat-auto-row">
+        <div class="chat-auto-row"><button onclick="showFeedbackModal()" style="background:none;border:none;color:var(--text-3);font-size:0.7rem;cursor:pointer;text-decoration:underline;">Leave feedback</button>
           <label class="chat-toggle-label">
             <input type="checkbox" id="auto-analyze-toggle" checked/>
             <span class="chat-toggle-track"><span class="chat-toggle-thumb"></span></span>

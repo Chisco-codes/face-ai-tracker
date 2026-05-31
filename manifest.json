@@ -5,12 +5,14 @@
   "description": "Real-time AI-powered face analysis — emotion detection, focus scoring, fatigue monitoring, and wellness coaching.",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#0a0c12",
   "theme_color": "#00e5ff",
   "orientation": "any",
   "scope": "/",
   "lang": "en",
   "categories": ["health", "productivity", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "icons/icon-72.png",
@@ -114,14 +116,12 @@
       "src": "screenshots/desktop.png",
       "sizes": "1280x720",
       "type": "image/png",
-      "form_factor": "wide",
       "label": "Face AI Tracker Dashboard"
     },
     {
       "src": "screenshots/mobile.png",
       "sizes": "390x844",
       "type": "image/png",
-      "form_factor": "narrow",
       "label": "Face AI Tracker on Mobile"
     }
   ]
