@@ -9,10 +9,10 @@
 // 1. CONFIG
 // ─────────────────────────────────────────────────────────────
 var CONFIG = {
-  DOT_RADIUS:        1.4,
+  DOT_RADIUS:        2.5,
   DOT_COLOR:         'rgba(0,229,255,0.55)',
   EYE_DOT_COLOR:     '#ff3366',
-  EYE_DOT_RADIUS:    3,
+  EYE_DOT_RADIUS:    5,
   BOX_COLOR:         'rgba(0,229,255,0.4)',
   FPS_INTERVAL:      500,
 
@@ -506,27 +506,47 @@ async function startCamera() {
 }
 
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 // 11. DETECTION LOOP
-// ─────────────────────────────────────────────────────────────
+// Android-safe: setTimeout + overlap guard + hidden tab skip
+// -------------------------------------------------------------
+var IS_ANDROID = /Android/i.test(navigator.userAgent);
+var IS_IOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+var IS_MOBILE  = IS_ANDROID || IS_IOS;
+var FRAME_MS   = IS_ANDROID ? 150 : IS_IOS ? 80 : 33;
+var _detecting = false;
+
+function scheduleNextFrame() {
+  if (!STATE.isRunning) return;
+  if (IS_ANDROID) {
+    setTimeout(detectionLoop, FRAME_MS);
+  } else {
+    STATE.animFrameId = requestAnimationFrame(detectionLoop);
+  }
+}
+
 async function detectionLoop() {
   if (!STATE.isRunning) return;
-  var now = performance.now();
 
-  // Throttle: 20fps mobile, 60fps desktop
-  var isMobile = window.innerWidth <= 768 ||
-                 /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  var minFrameMs = isMobile ? 50 : 16;
-
-  if (now - STATE.lastDetectionTime < minFrameMs) {
-    STATE.animFrameId = requestAnimationFrame(detectionLoop);
+  // Skip when tab hidden
+  if (document.visibilityState === 'hidden') {
+    scheduleNextFrame();
     return;
   }
-  STATE.lastDetectionTime = now;
+
+  // Overlap guard
+  if (_detecting) {
+    scheduleNextFrame();
+    return;
+  }
+
+  _detecting = true;
+  var now = performance.now();
 
   try {
     if (DOM.video.readyState < 2 || DOM.video.videoWidth === 0) {
-      STATE.animFrameId = requestAnimationFrame(detectionLoop);
+      _detecting = false;
+      scheduleNextFrame();
       return;
     }
     if (DOM.canvas.width  !== DOM.video.videoWidth ||
@@ -552,12 +572,13 @@ async function detectionLoop() {
     } else {
       updatePanel(false, 0);
       if (!STATE.calibrating && DOM.feedbackText)
-        DOM.feedbackText.textContent = '👤 No face detected — move closer to the camera.';
+        DOM.feedbackText.textContent = 'No face detected — move closer to the camera.';
     }
 
-    // Emotion detection — fire and forget (fixes Android hang)
+    // Emotion: every 3 frames desktop, every 25 frames Android
     STATE.framesSinceEmotion++;
-    if (STATE.framesSinceEmotion >= CONFIG.EMOTION_EVERY_N_FRAMES &&
+    var emotionEvery = IS_ANDROID ? 25 : CONFIG.EMOTION_EVERY_N_FRAMES;
+    if (STATE.framesSinceEmotion >= emotionEvery &&
         !STATE.calibrating && STATE.emotionModelReady) {
       STATE.framesSinceEmotion = 0;
       detectEmotions().then(function(expressions) {
@@ -572,6 +593,8 @@ async function detectionLoop() {
     console.warn('Frame error:', err.message);
   }
 
+  _detecting = false;
+
   // FPS counter
   STATE.frameCount++;
   if (now - STATE.lastFrameTime >= CONFIG.FPS_INTERVAL) {
@@ -581,7 +604,7 @@ async function detectionLoop() {
     STATE.lastFrameTime = now;
   }
 
-  STATE.animFrameId = requestAnimationFrame(detectionLoop);
+  scheduleNextFrame();
 }
 
 
@@ -792,7 +815,10 @@ async function init() {
       STATE.lastFrameTime      = performance.now();
       STATE.frameCount         = 0;
       STATE.calibDone          = false;
+      STATE.calibrating        = false;  // ensure clean start
       STATE.framesSinceEmotion = 0;
+      STATE.lastDetectionTime  = 0;
+      _detecting               = false;  // reset overlap guard
       // Reset threshold to fallback before calibration overrides it
       STATE.earThreshold       = CONFIG.EAR_FALLBACK;
       CHAT.history             = [];
@@ -815,7 +841,7 @@ async function init() {
       DOM.startBtn.textContent = 'Stop';
       DOM.startBtn.className   = 'btn-primary btn-stop';
       DOM.startBtn.disabled    = false;
-      detectionLoop();
+      scheduleNextFrame();
 
     } else {
 
@@ -1171,14 +1197,11 @@ function addChatMessage(role, text) {
     div.innerHTML = '<p>' + text + '</p>';
   }
   container.appendChild(div);
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      setTimeout(function() {
-        container.scrollTop = container.scrollHeight;
-        div.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }, 60);
-    });
-  });
+  // Scroll ONLY the chat container, never the whole page
+  // This stops the screen jumping down on Android when Aria replies
+  setTimeout(function() {
+    container.scrollTop = container.scrollHeight;
+  }, 80);
 }
 
 function showTypingIndicator() {
