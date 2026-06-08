@@ -5,16 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
   <title>Face AI Tracker</title>
 
-  <!-- PWA Manifest — makes app installable on phone and desktop -->
   <link rel="manifest" href="manifest.json"/>
 
-  <!-- iOS PWA support -->
-   <!-- iOS PWA — full support for Add to Home Screen -->
+  <!-- iOS PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="FaceAI"/>
- 
-  <!-- iOS icons — multiple sizes so every iPhone/iPad gets the right one -->
+
+  <!-- iOS icons -->
   <link rel="apple-touch-icon" href="icons/icon-152.png"/>
   <link rel="apple-touch-icon" sizes="72x72"   href="icons/icon-72.png"/>
   <link rel="apple-touch-icon" sizes="96x96"   href="icons/icon-96.png"/>
@@ -22,35 +20,28 @@
   <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144.png"/>
   <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png"/>
   <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png"/>
- 
-  <!-- iOS splash screens — stops the white flash on launch -->
-  <!-- These use the background colour of the app -->
-  <meta name="msapplication-TileColor" content="#0a0c12"/>
+
+  <meta name="msapplication-TileColor" content="#080a0f"/>
   <meta name="msapplication-TileImage" content="icons/icon-144.png"/>
- 
-  <!-- Prevent iOS from detecting phone numbers as links -->
   <meta name="format-detection" content="telephone=no"/>
- 
-  <!-- Makes the app feel native when launched from home screen -->
   <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="theme-color" content="#00d4f5"/>
+  <meta name="background-color" content="#080a0f"/>
 
-  <!-- Theme colour — matches the app accent colour -->
-  <meta name="theme-color" content="#00e5ff"/>
-  <meta name="background-color" content="#0a0c12"/>
-
-  <!-- SEO and social sharing -->
+  <!-- SEO -->
   <meta name="description" content="Real-time AI face analysis — emotion detection, focus scoring, fatigue monitoring and wellness coaching."/>
-  <meta name="keywords" content="face tracking, emotion detection, focus score, AI wellness, attention monitoring"/>
   <meta property="og:title" content="Face AI Tracker"/>
   <meta property="og:description" content="Real-time AI-powered behavioural analysis. Know your emotional state, focus level, and fatigue in real time."/>
   <meta property="og:type" content="website"/>
 
-  <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"/>
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96.png"/>
+  <link rel="icon" type="image/png" sizes="32x32"   href="icons/icon-96.png"/>
 
+  <!-- Fonts: Syne (display) + DM Sans (body) + DM Mono (numbers) -->
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
@@ -61,7 +52,7 @@
   <nav class="topnav">
     <div class="topnav-brand">
       <div class="brand-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="8" r="5" stroke="currentColor" stroke-width="1.8"/>
           <path d="M3 19c0-3.87 4.03-7 9-7s9 3.13 9 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           <circle cx="9" cy="7" r="1" fill="currentColor"/>
@@ -69,7 +60,7 @@
         </svg>
       </div>
       <span class="brand-name">Face AI Tracker</span>
-      <span class="brand-version">v3.0</span>
+      <span class="brand-version">v3.1</span>
     </div>
 
     <div class="topnav-status">
@@ -89,23 +80,19 @@
   </nav>
 
   <!-- ══════════════════════════════════════════════
-       MAIN DASHBOARD LAYOUT
-       Left column: video feed
-       Right column: scrollable panels
+       MAIN DASHBOARD
   ══════════════════════════════════════════════ -->
   <div class="dashboard">
 
     <!-- ── VIDEO COLUMN ─────────────────────── -->
     <div class="video-col">
 
-      <!-- Status bar -->
       <div class="status-bar">
         <span id="status-dot" class="dot dot--waiting"></span>
         <span id="status-text">Waiting for camera...</span>
         <span class="status-fps" id="fps-value">—</span>
       </div>
 
-      <!-- Video wrapper with canvas overlay -->
       <div class="video-wrapper" style="position:relative;">
         <video id="webcam" autoplay playsinline muted></video>
         <canvas id="overlay-canvas"></canvas>
@@ -116,11 +103,11 @@
             <div class="calib-icon">👁</div>
             <p class="calib-label">Calibrating... 0%</p>
             <div class="calib-bar-track"><div class="calib-bar-fill"></div></div>
-            <p class="calib-hint">Keep eyes <strong>OPEN</strong> — look straight at camera</p>
+            <p class="calib-hint">Keep eyes <strong>OPEN</strong> — look straight at the camera</p>
           </div>
         </div>
 
-        <!-- Live overlay stats on the video -->
+        <!-- Video overlay stats -->
         <div class="video-overlay-stats" id="video-overlay-stats" style="display:none;">
           <div class="vos-item">
             <span class="vos-label">EAR</span>
@@ -139,7 +126,7 @@
         </div>
       </div>
 
-      <!-- Feedback banner below video -->
+      <!-- Feedback banner -->
       <div class="feedback-banner" id="feedback-banner">
         <span class="feedback-icon" id="feedback-icon">💡</span>
         <p class="feedback-text" id="feedback-text">Start detection to see real-time feedback...</p>
@@ -183,10 +170,9 @@
           <h2 class="card-title">Focus Score</h2>
           <span class="focus-score-badge" id="focus-score-badge">—</span>
         </div>
-
         <div class="focus-ring-wrap">
           <svg class="focus-ring" viewBox="0 0 120 120">
-            <circle class="ring-bg"   cx="60" cy="60" r="50" />
+            <circle class="ring-bg"   cx="60" cy="60" r="50"/>
             <circle class="ring-fill" cx="60" cy="60" r="50" id="focus-ring-fill"
               stroke-dasharray="314" stroke-dashoffset="314"/>
           </svg>
@@ -197,41 +183,36 @@
         </div>
       </div>
 
-      <!-- METRICS GRID — 4 metric tiles -->
+      <!-- LIVE METRICS -->
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">Live Metrics</h2>
         </div>
         <div class="metric-grid">
-
           <div class="metric-tile">
             <div class="metric-tile-label">Eye Openness</div>
             <div class="metric-tile-value" id="ear-value">—</div>
             <div class="metric-tile-sub">EAR ratio</div>
           </div>
-
           <div class="metric-tile">
             <div class="metric-tile-label">Blink Rate</div>
             <div class="metric-tile-value" id="blink-rate">—</div>
-            <div class="metric-tile-sub">per min</div>
+            <div class="metric-tile-sub">per minute</div>
           </div>
-
           <div class="metric-tile">
             <div class="metric-tile-label">Head Tilt</div>
             <div class="metric-tile-value" id="head-tilt">—</div>
             <div class="metric-tile-sub">degrees</div>
           </div>
-
           <div class="metric-tile">
             <div class="metric-tile-label">Head Nod</div>
             <div class="metric-tile-value" id="head-nod">—</div>
             <div class="metric-tile-sub">degrees</div>
           </div>
-
         </div>
       </div>
 
-      <!-- SESSION STATS CARD -->
+      <!-- SESSION STATS -->
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">Session Stats</h2>
@@ -252,7 +233,7 @@
         </div>
       </div>
 
-      <!-- MODEL STATUS CARD -->
+      <!-- SYSTEM STATUS -->
       <div class="card card-compact">
         <div class="card-header">
           <h2 class="card-title">System</h2>
@@ -277,7 +258,7 @@
         </div>
       </div>
 
-      <!-- AI CHATBOX — Phase 5 -->
+      <!-- ARIA CHAT -->
       <div class="card chat-card">
         <div class="card-header">
           <h2 class="card-title">Aria — Wellness Coach</h2>
@@ -293,27 +274,26 @@
           </div>
         </div>
 
-        <!-- Auto-analysis toggle -->
-        <div class="chat-auto-row"><button onclick="showFeedbackModal()" style="background:none;border:none;color:var(--text-3);font-size:0.7rem;cursor:pointer;text-decoration:underline;">Leave feedback</button>
+        <div class="chat-auto-row">
+          <button onclick="showFeedbackModal()" style="background:none;border:none;color:var(--text-3);font-size:0.68rem;cursor:pointer;text-decoration:underline;padding:0;">Leave feedback</button>
           <label class="chat-toggle-label">
             <input type="checkbox" id="auto-analyze-toggle" checked/>
             <span class="chat-toggle-track"><span class="chat-toggle-thumb"></span></span>
-            <span>Auto-analyse every 45s</span>
+            <span>Auto-analyse every 2 min</span>
           </label>
           <span class="chat-status-text" id="chat-status-text">Server offline</span>
         </div>
 
-        <!-- Manual message input -->
         <div class="chat-input-row">
           <textarea
             id="chat-input"
             class="chat-input"
-            placeholder="Talk to Aria... e.g. I feel overwhelmed today"
+            placeholder="Talk to Aria..."
             maxlength="2000"
             rows="1"
           ></textarea>
           <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
               <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -321,13 +301,13 @@
         </div>
       </div>
 
-      <!-- INSTALL BANNER — Smart install for all platforms -->
+      <!-- INSTALL CARD -->
       <div class="card install-card" id="install-card" style="display:none;">
         <div class="install-card-header">
           <div class="install-icon-wrap">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="8" r="5" stroke="#00e5ff" stroke-width="1.8"/>
-              <path d="M3 19c0-3.87 4.03-7 9-7s9 3.13 9 7" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round"/>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="8" r="5" stroke="#00d4f5" stroke-width="1.8"/>
+              <path d="M3 19c0-3.87 4.03-7 9-7s9 3.13 9 7" stroke="#00d4f5" stroke-width="1.8" stroke-linecap="round"/>
             </svg>
           </div>
           <div class="install-card-text">
@@ -336,20 +316,18 @@
           </div>
           <button class="install-close-btn" onclick="dismissInstall()">✕</button>
         </div>
-        <!-- Android / Desktop Chrome button -->
         <button class="install-btn-main" id="install-btn-main" onclick="triggerInstall()" style="display:none;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M12 3v13M5 13l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           Install App
         </button>
-        <!-- iOS Safari instructions -->
         <div class="install-ios-steps" id="install-ios-steps" style="display:none;">
           <div class="install-step">
             <span class="install-step-num">1</span>
             <span>Tap the <strong>Share</strong> button
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-left:3px;">
-                <path d="M8 12H3v9h18v-9h-5M12 3v13M8 7l4-4 4 4" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-left:3px;">
+                <path d="M8 12H3v9h18v-9h-5M12 3v13M8 7l4-4 4 4" stroke="#00d4f5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
               at the bottom of Safari
             </span>
