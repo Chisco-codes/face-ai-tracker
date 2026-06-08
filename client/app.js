@@ -513,7 +513,7 @@ async function startCamera() {
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_IOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 var IS_MOBILE  = IS_ANDROID || IS_IOS;
-var FRAME_MS   = IS_ANDROID ? 150 : IS_IOS ? 80 : 33;
+var FRAME_MS   = IS_ANDROID ? 250 : IS_IOS ? 80 : 33;
 var _detecting = false;
 
 function scheduleNextFrame() {
@@ -560,12 +560,35 @@ async function detectionLoop() {
     STATE.scaleX = DOM.canvas.width  / displayW;
     STATE.scaleY = DOM.canvas.height / displayH;
 
-    var faces = await STATE.meshModel.estimateFaces(DOM.video, { flipHorizontal: false });
+    // On Android, draw video to a half-res offscreen canvas first.
+    // Passing a smaller image to estimateFaces cuts CPU/GPU work in half
+    // which is what prevents the "page unresponsive" crash.
+    var sourceEl = DOM.video;
+    if (IS_ANDROID) {
+      if (!window._androidCanvas) {
+        window._androidCanvas = document.createElement('canvas');
+      }
+      var ac = window._androidCanvas;
+      var scale = 0.5;
+      ac.width  = Math.round(DOM.video.videoWidth  * scale);
+      ac.height = Math.round(DOM.video.videoHeight * scale);
+      var ac2d = ac.getContext('2d');
+      ac2d.drawImage(DOM.video, 0, 0, ac.width, ac.height);
+      sourceEl = ac;
+    }
+    var faces = await STATE.meshModel.estimateFaces(sourceEl, { flipHorizontal: false });
     CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
 
     if (faces && faces.length > 0 && faces[0].keypoints && faces[0].keypoints.length > 0) {
       var pts = faces[0].keypoints;
-      drawFaceMesh(pts);
+      // On Android skip the full 468-dot mesh draw to save GPU time
+      // Only draw the important eye dots + bounding box
+      if (IS_ANDROID) {
+        CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+        drawEyeDotsOnly(pts);
+      } else {
+        drawFaceMesh(pts);
+      }
       var m = computeMetrics(pts);
       updatePanel(true, pts.length);
       updateMetrics(m);
@@ -634,6 +657,22 @@ function drawFaceMesh(kpts) {
     }
   }
 
+  CTX.restore();
+}
+
+// Lightweight draw for Android — only eye landmarks
+function drawEyeDotsOnly(kpts) {
+  var eyeIdx = LM.RIGHT_EYE.concat(LM.LEFT_EYE);
+  CTX.save();
+  CTX.fillStyle = CONFIG.EYE_DOT_COLOR;
+  for (var j = 0; j < eyeIdx.length; j++) {
+    var p = kpts[eyeIdx[j]];
+    if (p) {
+      CTX.beginPath();
+      CTX.arc(p.x, p.y, CONFIG.EYE_DOT_RADIUS, 0, Math.PI * 2);
+      CTX.fill();
+    }
+  }
   CTX.restore();
 }
 
@@ -1122,6 +1161,8 @@ async function sendChatMessage() {
   input.value = '';
   input.style.height = 'auto';
   input.style.overflowY = 'hidden';
+  // Blur input after send to prevent keyboard resize causing page jump
+  input.blur();
   addChatMessage('user', text);
   CHAT.lastUserMessageTime = performance.now();
   CHAT.history.push({ role: 'user', content: text });
@@ -1197,11 +1238,16 @@ function addChatMessage(role, text) {
     div.innerHTML = '<p>' + text + '</p>';
   }
   container.appendChild(div);
-  // Scroll ONLY the chat container, never the whole page
-  // This stops the screen jumping down on Android when Aria replies
+  // Scroll only the chat container — never the whole page
   setTimeout(function() {
-    container.scrollTop = container.scrollHeight;
-  }, 80);
+    try {
+      // Save page scroll position first
+      var pageY = window.scrollY || window.pageYOffset;
+      container.scrollTop = container.scrollHeight;
+      // Restore page scroll so nothing jumps
+      window.scrollTo({ top: pageY, behavior: 'instant' });
+    } catch(e) {}
+  }, 100);
 }
 
 function showTypingIndicator() {
