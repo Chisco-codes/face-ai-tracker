@@ -560,32 +560,17 @@ async function detectionLoop() {
     STATE.scaleX = DOM.canvas.width  / displayW;
     STATE.scaleY = DOM.canvas.height / displayH;
 
-    // On Android, draw video to a half-res offscreen canvas first.
-    // Passing a smaller image to estimateFaces cuts CPU/GPU work in half
-    // which is what prevents the "page unresponsive" crash.
-    var sourceEl = DOM.video;
-    if (IS_ANDROID) {
-      if (!window._androidCanvas) {
-        window._androidCanvas = document.createElement('canvas');
-      }
-      var ac = window._androidCanvas;
-      var scale = 0.5;
-      ac.width  = Math.round(DOM.video.videoWidth  * scale);
-      ac.height = Math.round(DOM.video.videoHeight * scale);
-      var ac2d = ac.getContext('2d');
-      ac2d.drawImage(DOM.video, 0, 0, ac.width, ac.height);
-      sourceEl = ac;
-    }
-    var faces = await STATE.meshModel.estimateFaces(sourceEl, { flipHorizontal: false });
+    // Pass video directly — no scaling trick
+    // Scaling caused coordinate mismatch (dots float above face)
+    var faces = await STATE.meshModel.estimateFaces(DOM.video, { flipHorizontal: false });
     CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
 
     if (faces && faces.length > 0 && faces[0].keypoints && faces[0].keypoints.length > 0) {
       var pts = faces[0].keypoints;
-      // On Android skip the full 468-dot mesh draw to save GPU time
-      // Only draw the important eye dots + bounding box
+      // Android: draw sparse mesh (contour + eyes) — fast but visible
+      // Desktop/iOS: full 468-dot mesh
       if (IS_ANDROID) {
-        CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
-        drawEyeDotsOnly(pts);
+        drawAndroidMesh(pts);
       } else {
         drawFaceMesh(pts);
       }
@@ -662,16 +647,45 @@ function drawFaceMesh(kpts) {
   CTX.restore();
 }
 
-// Lightweight draw for Android — only eye landmarks
-function drawEyeDotsOnly(kpts) {
-  var eyeIdx = LM.RIGHT_EYE.concat(LM.LEFT_EYE);
+// Android mesh: face oval contour + eyes + nose tip + mouth corners
+// ~60 key points instead of 468 — fast enough for 3fps Android
+var ANDROID_MESH_IDX = [
+  // Face oval
+  10,338,297,332,284,251,389,356,454,323,361,288,
+  397,365,379,378,400,377,152,148,176,149,150,136,
+  172,58,132,93,234,127,162,21,54,103,67,109,
+  // Eyes (full)
+  33,160,158,133,153,144,263,387,385,362,380,373,
+  // Eyebrows
+  70,63,105,66,107,336,296,334,293,300,
+  // Nose
+  1,4,5,195,197,
+  // Mouth
+  61,185,40,39,37,0,267,269,270,409,291,
+  // Chin and cheeks
+  152,234,454,10
+];
+
+function drawAndroidMesh(kpts) {
   CTX.save();
-  CTX.fillStyle = CONFIG.EYE_DOT_COLOR;
-  for (var j = 0; j < eyeIdx.length; j++) {
-    var p = kpts[eyeIdx[j]];
+  // Draw contour dots
+  CTX.fillStyle = 'rgba(0,212,245,0.75)';
+  for (var i = 0; i < ANDROID_MESH_IDX.length; i++) {
+    var p = kpts[ANDROID_MESH_IDX[i]];
     if (p) {
       CTX.beginPath();
-      CTX.arc(p.x, p.y, CONFIG.EYE_DOT_RADIUS, 0, Math.PI * 2);
+      CTX.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+      CTX.fill();
+    }
+  }
+  // Eye dots highlighted
+  var eyeIdx = LM.RIGHT_EYE.concat(LM.LEFT_EYE);
+  CTX.fillStyle = CONFIG.EYE_DOT_COLOR;
+  for (var j = 0; j < eyeIdx.length; j++) {
+    var ep = kpts[eyeIdx[j]];
+    if (ep) {
+      CTX.beginPath();
+      CTX.arc(ep.x, ep.y, CONFIG.EYE_DOT_RADIUS, 0, Math.PI * 2);
       CTX.fill();
     }
   }
