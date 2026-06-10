@@ -23,7 +23,7 @@ var CONFIG = {
   BLINK_FRAMES:      3,         // slightly faster response
 
   // Calibration
-  CALIB_DURATION_MS: 4000,
+  CALIB_DURATION_MS: window && /Android/i.test(navigator.userAgent) ? 2000 : 4000,
 
   // Head pose thresholds (degrees)
   TILT_THRESHOLD:    15,
@@ -513,7 +513,7 @@ async function startCamera() {
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_IOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 var IS_MOBILE  = IS_ANDROID || IS_IOS;
-var FRAME_MS   = IS_ANDROID ? 250 : IS_IOS ? 80 : 33;
+var FRAME_MS   = IS_ANDROID ? 300 : IS_IOS ? 80 : 33;
 var _detecting = false;
 
 function scheduleNextFrame() {
@@ -598,18 +598,20 @@ async function detectionLoop() {
         DOM.feedbackText.textContent = 'No face detected — move closer to the camera.';
     }
 
-    // Emotion: every 3 frames desktop, every 25 frames Android
-    STATE.framesSinceEmotion++;
-    var emotionEvery = IS_ANDROID ? 25 : CONFIG.EMOTION_EVERY_N_FRAMES;
-    if (STATE.framesSinceEmotion >= emotionEvery &&
-        !STATE.calibrating && STATE.emotionModelReady) {
-      STATE.framesSinceEmotion = 0;
-      detectEmotions().then(function(expressions) {
-        if (expressions) {
-          smoothEmotions(expressions);
-          updateEmotionPanel();
-        }
-      });
+    // Emotion: desktop/iOS only — Android runs ONLY facemesh
+    // Running two ML models simultaneously crashes Android Chrome
+    if (!IS_ANDROID) {
+      STATE.framesSinceEmotion++;
+      if (STATE.framesSinceEmotion >= CONFIG.EMOTION_EVERY_N_FRAMES &&
+          !STATE.calibrating && STATE.emotionModelReady) {
+        STATE.framesSinceEmotion = 0;
+        detectEmotions().then(function(expressions) {
+          if (expressions) {
+            smoothEmotions(expressions);
+            updateEmotionPanel();
+          }
+        });
+      }
     }
 
   } catch (err) {
@@ -906,12 +908,13 @@ async function init() {
       updateFocusRing(0);
       if (DOM.fpsValue) DOM.fpsValue.textContent = '—';
 
-      // ── Show feedback modal when session was long enough ──
+      // Show feedback modal after every session >= 20s
+      // Reset shown flag so it can appear again next session
+      FEEDBACK.shown = false;
       var sessionMs = STATE.sessionStart
         ? performance.now() - STATE.sessionStart : 0;
       if (sessionMs >= FEEDBACK.minSessionMs) {
-        // Small delay so the UI settles before modal appears
-        setTimeout(showFeedbackModal, 600);
+        setTimeout(showFeedbackModal, 800);
       }
     }
   });
@@ -1238,16 +1241,18 @@ function addChatMessage(role, text) {
     div.innerHTML = '<p>' + text + '</p>';
   }
   container.appendChild(div);
-  // Scroll only the chat container — never the whole page
+  // Scroll only the chat box — lock page scroll while doing it
   setTimeout(function() {
     try {
-      // Save page scroll position first
-      var pageY = window.scrollY || window.pageYOffset;
+      var pageY = window.scrollY || window.pageYOffset || 0;
+      // Lock body scroll temporarily
+      document.body.style.overflow = 'hidden';
       container.scrollTop = container.scrollHeight;
-      // Restore page scroll so nothing jumps
-      window.scrollTo({ top: pageY, behavior: 'instant' });
+      // Restore body scroll and page position
+      document.body.style.overflow = '';
+      if (pageY > 0) window.scrollTo(0, pageY);
     } catch(e) {}
-  }, 100);
+  }, 120);
 }
 
 function showTypingIndicator() {
@@ -1329,7 +1334,7 @@ document.addEventListener('visibilitychange', function() {
 var FEEDBACK = {
   shown:        false,
   selectedStar: 0,
-  minSessionMs: 60000,
+  minSessionMs: 20000,  // 20 seconds — enough to have tried the app
 };
 
 function buildFeedbackModal() {

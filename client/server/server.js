@@ -7,32 +7,60 @@ const path    = require('path');
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
-// ── FEEDBACK FILE ─────────────────────────────────────────────
-// All feedback is saved here as newline-delimited JSON (easy to read)
-const FEEDBACK_FILE = path.join(__dirname, 'feedback.log');
+// ── FEEDBACK STORAGE ─────────────────────────────────────────
+// Dual storage: in-memory (survives the session) + file (survives restarts)
+// Render free tier has ephemeral disk — file may be wiped on redeploy
+// In-memory keeps the last 500 entries as a reliable backup
+const FEEDBACK_FILE   = path.join(__dirname, 'feedback.log');
+const feedbackMemory  = [];   // in-memory store
 
 function saveFeedback(entry) {
+  // 1. Store in memory
+  feedbackMemory.push(entry);
+  if (feedbackMemory.length > 500) feedbackMemory.shift();
+
+  // 2. Try to write to file (best effort)
   try {
     const line = JSON.stringify(entry) + '\n';
     fs.appendFileSync(FEEDBACK_FILE, line, 'utf8');
-    console.log('[Feedback] ⭐'.repeat(entry.rating || 0) + ' — ' + (entry.text || '(no comment)'));
   } catch (e) {
-    console.error('[Feedback] Failed to save:', e.message);
+    console.warn('[Feedback] File write failed (disk may be read-only):', e.message);
   }
+
+  // 3. Always log to console — visible in Render logs dashboard
+  const stars  = '⭐'.repeat(entry.rating || 0) || '(no rating)';
+  const comment = entry.text || '(no comment)';
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('  NEW FEEDBACK RECEIVED');
+  console.log('  Rating:  ' + stars);
+  console.log('  Comment: ' + comment);
+  console.log('  Session: ' + (entry.session || 'unknown'));
+  console.log('  Time:    ' + (entry.timestamp || new Date().toISOString()));
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
 
 function readAllFeedback() {
+  // Merge file + memory (memory is the most reliable on Render)
+  const fromMemory = feedbackMemory.slice();
   try {
-    if (!fs.existsSync(FEEDBACK_FILE)) return [];
-    const lines = fs.readFileSync(FEEDBACK_FILE, 'utf8')
-      .split('\n')
-      .filter(Boolean);
-    return lines.map(function(l) {
-      try { return JSON.parse(l); } catch(e) { return null; }
-    }).filter(Boolean);
-  } catch (e) {
-    return [];
-  }
+    if (fs.existsSync(FEEDBACK_FILE)) {
+      const lines = fs.readFileSync(FEEDBACK_FILE, 'utf8')
+        .split('\n').filter(Boolean);
+      const fromFile = lines.map(l => {
+        try { return JSON.parse(l); } catch(e) { return null; }
+      }).filter(Boolean);
+      // Merge: use file as base, memory fills the gaps
+      // Deduplicate by timestamp
+      const seen = new Set(fromMemory.map(e => e.timestamp));
+      const merged = [...fromMemory];
+      for (const e of fromFile) {
+        if (!seen.has(e.timestamp)) merged.push(e);
+      }
+      merged.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      return merged;
+    }
+  } catch(e) {}
+  return fromMemory;
 }
 
 // ── MIDDLEWARE ────────────────────────────────────────────────
