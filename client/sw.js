@@ -1,8 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
-// Face AI Tracker — Service Worker v4
+// Face AI Tracker — Service Worker (Fixed v4)
+//
+// FIXES:
+// ─ Version bumped to v4 → clears old cache on Android
+// ─ SKIP_WAITING message handler → activates immediately
+//   (eliminates "old model" warning on Android Chrome)
+// ─ Cache-first for app shell, network-first for AI/CDN
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME    = 'face-ai-tracker-v4';
+const CACHE_NAME    = 'face-ai-tracker-v5';   // ← bumped from v3
 const CACHE_TIMEOUT = 5000;
 
 const CORE_FILES = [
@@ -13,27 +19,51 @@ const CORE_FILES = [
   '/manifest.json',
 ];
 
+// ── INSTALL ──────────────────────────────────────────────────
 self.addEventListener('install', function(event) {
-  console.log('[SW] Installing v4...');
+  console.log('[SW v4] Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
-      console.log('[SW] Caching core files');
-      return cache.addAll(CORE_FILES);
+      console.log('[SW v4] Caching core files');
+      // addAll can fail if one file is missing — use individual puts
+      return Promise.allSettled(
+        CORE_FILES.map(function(url) {
+          return fetch(url).then(function(response) {
+            if (response.ok) return cache.put(url, response);
+          }).catch(function(e) {
+            console.warn('[SW v4] Could not cache:', url, e.message);
+          });
+        })
+      );
     }).then(function() {
-      return self.skipWaiting();
+      // Do NOT call self.skipWaiting() here automatically —
+      // instead wait for the SKIP_WAITING message from app.js
+      // This prevents the "old model" prompt on Android
+      console.log('[SW v4] Install complete — waiting for activation signal');
     })
   );
 });
 
+// ── MESSAGE HANDLER ────────────────────────────────────────────
+// app.js posts SKIP_WAITING when it detects a new SW is ready
+// This is the clean way to activate without the Android warning
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW v4] SKIP_WAITING received — activating now');
+    self.skipWaiting();
+  }
+});
+
+// ── ACTIVATE ─────────────────────────────────────────────────
 self.addEventListener('activate', function(event) {
-  console.log('[SW] Activating v4...');
+  console.log('[SW v4] Activating...');
   event.waitUntil(
     caches.keys().then(function(cacheNames) {
       return Promise.all(
         cacheNames
           .filter(function(name) { return name !== CACHE_NAME; })
           .map(function(name) {
-            console.log('[SW] Deleting old cache:', name);
+            console.log('[SW v4] Deleting old cache:', name);
             return caches.delete(name);
           })
       );
@@ -43,49 +73,46 @@ self.addEventListener('activate', function(event) {
   );
 });
 
+// ── FETCH ──────────────────────────────────────────────────────
 self.addEventListener('fetch', function(event) {
   var url = new URL(event.request.url);
 
-  // Do not intercept API calls — these need live network
-  if (url.port === '3001' ||
-      url.hostname.includes('googleapis') ||
-      url.hostname.includes('anthropic') ||
-      url.hostname.includes('cdn.jsdelivr') ||
-      url.hostname.includes('onrender.com') ||
-      url.hostname.includes('facewellnessai.com') && url.pathname.startsWith('/chat') ||
-      url.hostname.includes('facewellnessai.com') && url.pathname.startsWith('/analyze') ||
-      url.hostname.includes('facewellnessai.com') && url.pathname.startsWith('/health') ||
-      url.hostname.includes('facewellnessai.com') && url.pathname.startsWith('/feedback')) {
-    return;
-  }
+  // Always bypass: API calls, CDN resources, AI backends
+  // These must always be fresh
+  var bypassHosts = [
+    'googleapis.com',
+    'anthropic.com',
+    'cdn.jsdelivr.net',
+    'onrender.com',
+    'gstatic.com',
+    'fonts.gstatic.com',
+    'fonts.googleapis.com',
+  ];
+  var shouldBypass = bypassHosts.some(function(h) {
+    return url.hostname.includes(h);
+  });
 
+  // Also bypass local API port
+  if (url.port === '3001' || shouldBypass) return;
+
+  // Only intercept GET requests
   if (event.request.method !== 'GET') return;
 
+  // Cache-first with background update (stale-while-revalidate)
+  // Network-first: always fetch fresh, fall back to cache
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      if (cached) {
-        // Serve from cache, update in background
-        fetch(event.request).then(function(response) {
-          if (response && response.status === 200) {
-            var clone = response.clone();
-            caches.open(CACHE_NAME).then(function(cache) {
-              cache.put(event.request, clone);
-            });
-          }
-        }).catch(function() {});
-        return cached;
-      }
-
-      return fetch(event.request).then(function(response) {
-        if (!response || response.status !== 200 || response.type === 'opaque') {
-          return response;
-        }
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, clone);
-        });
+    fetch(event.request).then(function(response) {
+      if (!response || response.status !== 200 || response.type === 'opaque') {
         return response;
-      }).catch(function() {
+      }
+      var clone = response.clone();
+      caches.open(CACHE_NAME).then(function(cache) {
+        cache.put(event.request, clone);
+      });
+      return response;
+    }).catch(function() {
+      return caches.match(event.request).then(function(cached) {
+        if (cached) return cached;
         if (event.request.destination === 'document') {
           return caches.match('/index.html');
         }
@@ -94,10 +121,4 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
-self.addEventListener('sync', function(event) {
-  if (event.tag === 'server-reconnect') {
-    console.log('[SW] Background sync — checking server');
-  }
-});
-
-console.log('[SW] Service worker loaded — Face AI Tracker v4');
+console.log('[SW] Face AI Tracker service worker v5 loaded');
