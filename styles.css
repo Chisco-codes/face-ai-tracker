@@ -407,57 +407,112 @@ canvas#overlay-canvas {
   text-align: center;
 }
 
-/* ── EMOTION CARD ────────────────────────────────────────────── */
+/* ── EMOTION CARD — Professional ───────────────────────────── */
 .emotion-hero {
   display:       flex;
   align-items:   center;
   gap:           16px;
-  padding:       12px 0 16px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 14px;
+  padding:       14px 16px;
+  border-radius: var(--radius-sm);
+  border:        1px solid var(--border);
+  margin-bottom: 16px;
+  transition:    background 0.5s ease, border-color 0.5s ease;
+  background:    rgba(0,212,245,0.06);
 }
 
-.emotion-emoji-large {
-  font-size:   2.6rem;
-  line-height: 1;
-  transition:  all 0.5s ease;
-  filter:      drop-shadow(0 0 8px rgba(0,212,245,0.15));
+.emotion-svg-wrap {
+  flex-shrink: 0;
+  width:       52px;
+  height:      52px;
+  display:     flex;
+  align-items: center;
+  justify-content: center;
+  transition:  all 0.4s ease;
+  filter:      drop-shadow(0 0 10px rgba(0,212,245,0.2));
+}
+
+.emotion-svg-wrap svg {
+  transition: all 0.5s ease;
+}
+
+.emotion-hero-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .emotion-name-large {
   font-family:    var(--font-display);
-  font-size:      1.15rem;
-  font-weight:    700;
-  text-transform: capitalize;
-  color:          var(--text);
-  letter-spacing: -0.3px;
+  font-size:      1.1rem;
+  font-weight:    800;
+  color:          var(--accent);
+  letter-spacing: 1.5px;
+  transition:     color 0.4s ease;
+}
+
+.emotion-desc {
+  font-size:   0.7rem;
+  color:       var(--text-2);
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+
+/* Confidence meter */
+.emotion-conf-wrap {
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+  margin-top:  4px;
+}
+
+.emotion-conf-track {
+  flex:          1;
+  height:        3px;
+  background:    var(--surface-3);
+  border-radius: 2px;
+  overflow:      hidden;
+}
+
+.emotion-conf-bar {
+  height:        100%;
+  border-radius: 2px;
+  width:         0%;
+  transition:    width 0.5s ease, background 0.4s ease;
 }
 
 .emotion-conf-text {
-  font-size:   0.73rem;
-  color:       var(--text-2);
-  margin-top:  4px;
-  font-weight: 400;
+  font-family:  var(--font-mono);
+  font-size:    0.65rem;
+  color:        var(--text-2);
+  white-space:  nowrap;
+  flex-shrink:  0;
 }
 
 .emotion-grid {
   display:        flex;
   flex-direction: column;
-  gap:            7px;
+  gap:            6px;
 }
 
 .emotion-row {
   display:     flex;
   align-items: center;
   gap:         10px;
+  padding:     3px 6px;
+  border-radius: var(--radius-xs);
+  transition:  opacity 0.3s ease, transform 0.3s ease;
 }
 
 .er-label {
-  font-size:   0.73rem;
-  color:       var(--text-2);
-  width:       88px;
-  flex-shrink: 0;
-  font-weight: 400;
+  font-family:    var(--font-mono);
+  font-size:      0.68rem;
+  color:          var(--text-2);
+  width:          76px;
+  flex-shrink:    0;
+  font-weight:    500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
 
 .er-track {
@@ -475,13 +530,8 @@ canvas#overlay-canvas {
   transition:    width 0.4s ease, opacity 0.3s;
 }
 
-.fill-happy     { background: linear-gradient(90deg, #00c853, #00e676); }
-.fill-neutral   { background: linear-gradient(90deg, #00b0d6, #00d4f5); }
-.fill-sad       { background: linear-gradient(90deg, #5c6bc0, #7986cb); }
-.fill-angry     { background: linear-gradient(90deg, #e53935, #ff5252); }
-.fill-surprised { background: linear-gradient(90deg, #f9a825, #ffd740); }
-.fill-fearful   { background: linear-gradient(90deg, #e65100, #ff6d00); }
-.fill-disgusted { background: linear-gradient(90deg, #7cb342, #b2ff59); }
+/* Emotion bar colors set dynamically by JS based on EMOTION_CONFIG */
+.er-fill { transition: width 0.4s ease, background 0.4s ease; }
 
 .er-pct {
   font-family:          var(--font-mono);

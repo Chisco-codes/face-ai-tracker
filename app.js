@@ -61,15 +61,78 @@ var LM = {
   FOREHEAD:     10,
 };
 
+// Professional emotion config — no emojis
+// Each entry: label, color accent, signal strength description
 var EMOTION_CONFIG = {
-  happy:     { emoji: '😊', label: 'Happy'     },
-  neutral:   { emoji: '😐', label: 'Neutral'   },
-  sad:       { emoji: '😔', label: 'Sad'       },
-  angry:     { emoji: '😠', label: 'Angry'     },
-  surprised: { emoji: '😲', label: 'Surprised' },
-  fearful:   { emoji: '😨', label: 'Fearful'   },
-  disgusted: { emoji: '🤢', label: 'Disgusted' },
+  happy:     { label: 'Happy',     color: '#00e676', bg: 'rgba(0,230,118,0.12)',    desc: 'Positive affect detected',      icon: 'happy'     },
+  neutral:   { label: 'Neutral',   color: '#00d4f5', bg: 'rgba(0,212,245,0.12)',    desc: 'Baseline expression',           icon: 'neutral'   },
+  sad:       { label: 'Sad',       color: '#7986cb', bg: 'rgba(121,134,203,0.12)',  desc: 'Low valence detected',          icon: 'sad'       },
+  angry:     { label: 'Angry',     color: '#ff5252', bg: 'rgba(255,82,82,0.12)',    desc: 'High arousal negative affect',  icon: 'angry'     },
+  surprised: { label: 'Surprised', color: '#ffd740', bg: 'rgba(255,215,64,0.12)',   desc: 'Unexpected stimulus response',  icon: 'surprised' },
+  fearful:   { label: 'Fearful',   color: '#ff6d00', bg: 'rgba(255,109,0,0.12)',    desc: 'Anxiety signal detected',       icon: 'fearful'   },
+  disgusted: { label: 'Disgusted', color: '#b2ff59', bg: 'rgba(178,255,89,0.12)',   desc: 'Aversion response detected',    icon: 'disgusted' },
 };
+
+// SVG face icons for each emotion — drawn programmatically
+// These replace emojis with clean vector illustrations
+function getEmotionSVG(icon, color) {
+  var c = color || '#00d4f5';
+  var svgs = {
+    happy: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none">'
+      + '<circle cx="24" cy="24" r="22" stroke="' + c + '" stroke-width="2" fill="' + c + '14"/>'
+      + '<circle cx="17" cy="19" r="2.5" fill="' + c + '"/>'
+      + '<circle cx="31" cy="19" r="2.5" fill="' + c + '"/>'
+      + '<path d="M15 28c2 5 16 5 18 0" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round" fill="none"/>'
+      + '</svg>',
+
+    neutral: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none">'
+      + '<circle cx="24" cy="24" r="22" stroke="' + c + '" stroke-width="2" fill="' + c + '14"/>'
+      + '<circle cx="17" cy="19" r="2.5" fill="' + c + '"/>'
+      + '<circle cx="31" cy="19" r="2.5" fill="' + c + '"/>'
+      + '<line x1="16" y1="30" x2="32" y2="30" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round"/>'
+      + '</svg>',
+
+    sad: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none">'
+      + '<circle cx="24" cy="24" r="22" stroke="' + c + '" stroke-width="2" fill="' + c + '14"/>'
+      + '<circle cx="17" cy="19" r="2.5" fill="' + c + '"/>'
+      + '<circle cx="31" cy="19" r="2.5" fill="' + c + '"/>'
+      + '<path d="M15 32c2-4 16-4 18 0" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round" fill="none"/>'
+      + '</svg>',
+
+    angry: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none">'
+      + '<circle cx="24" cy="24" r="22" stroke="' + c + '" stroke-width="2" fill="' + c + '14"/>'
+      + '<path d="M13 16l8 4M35 16l-8 4" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round"/>'
+      + '<circle cx="17" cy="21" r="2.5" fill="' + c + '"/>'
+      + '<circle cx="31" cy="21" r="2.5" fill="' + c + '"/>'
+      + '<path d="M15 33c2-4 16-4 18 0" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round" fill="none"/>'
+      + '</svg>',
+
+    surprised: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none">'
+      + '<circle cx="24" cy="24" r="22" stroke="' + c + '" stroke-width="2" fill="' + c + '14"/>'
+      + '<path d="M13 17l6 2M35 17l-6 2" stroke="' + c + '" stroke-width="2" stroke-linecap="round"/>'
+      + '<circle cx="17" cy="20" r="2.5" fill="' + c + '"/>'
+      + '<circle cx="31" cy="20" r="2.5" fill="' + c + '"/>'
+      + '<ellipse cx="24" cy="31" rx="5" ry="6" stroke="' + c + '" stroke-width="2" fill="none"/>'
+      + '</svg>',
+
+    fearful: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none">'
+      + '<circle cx="24" cy="24" r="22" stroke="' + c + '" stroke-width="2" fill="' + c + '14"/>'
+      + '<path d="M13 17l6 3M35 17l-6 3" stroke="' + c + '" stroke-width="2" stroke-linecap="round"/>'
+      + '<ellipse cx="17" cy="21" rx="3" ry="3.5" fill="' + c + '"/>'
+      + '<ellipse cx="31" cy="21" rx="3" ry="3.5" fill="' + c + '"/>'
+      + '<path d="M16 31c1-2 4-3 8-3s7 1 8 3" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round" fill="none"/>'
+      + '</svg>',
+
+    disgusted: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none">'
+      + '<circle cx="24" cy="24" r="22" stroke="' + c + '" stroke-width="2" fill="' + c + '14"/>'
+      + '<path d="M13 18l8 2M35 18l-8 2" stroke="' + c + '" stroke-width="2" stroke-linecap="round"/>'
+      + '<circle cx="17" cy="21" r="2.5" fill="' + c + '"/>'
+      + '<circle cx="31" cy="21" r="2.5" fill="' + c + '"/>'
+      + '<path d="M14 30q4-2 6 0t6 0t6-2" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round" fill="none"/>'
+      + '</svg>',
+  };
+  return svgs[icon] || svgs['neutral'];
+}
 
 
 // ─────────────────────────────────────────────────────────────
@@ -489,19 +552,54 @@ async function loadModels() {
 async function startCamera() {
   setStatus('Requesting camera permission...', 'waiting');
   try {
-    var stream = await navigator.mediaDevices.getUserMedia({
-      video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' },
+    // Mobile-optimised camera constraints
+    // Lower resolution on mobile = less GPU work = no hang
+    var mobileConstraints = {
+      video: {
+        facingMode:  'user',
+        width:       { ideal: 320, max: 480 },
+        height:      { ideal: 240, max: 360 },
+        frameRate:   { ideal: 15,  max: 20  },  // cap FPS at source
+      },
       audio: false,
-    });
+    };
+    var desktopConstraints = {
+      video: {
+        facingMode:  'user',
+        width:       { ideal: 640 },
+        height:      { ideal: 480 },
+        frameRate:   { ideal: 30  },
+      },
+      audio: false,
+    };
+
+    var constraints = IS_MOBILE ? mobileConstraints : desktopConstraints;
+    var stream = await navigator.mediaDevices.getUserMedia(constraints);
+
     DOM.video.srcObject = stream;
     await new Promise(function(r){ DOM.video.addEventListener('loadedmetadata', r, {once:true}); });
     await new Promise(function(r){ DOM.video.addEventListener('canplay', r, {once:true}); });
     DOM.canvas.width  = DOM.video.videoWidth;
     DOM.canvas.height = DOM.video.videoHeight;
+
+    console.log('[Camera] ' + DOM.video.videoWidth + 'x' + DOM.video.videoHeight
+      + ' @ ' + (IS_MOBILE ? '15fps mobile' : '30fps desktop'));
     return true;
   } catch (err) {
-    setStatus('Camera error: ' + err.message, 'error');
-    return false;
+    // If mobile constraints fail, try basic fallback
+    try {
+      var fallback = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' }, audio: false
+      });
+      DOM.video.srcObject = fallback;
+      await new Promise(function(r){ DOM.video.addEventListener('loadedmetadata', r, {once:true}); });
+      DOM.canvas.width  = DOM.video.videoWidth;
+      DOM.canvas.height = DOM.video.videoHeight;
+      return true;
+    } catch(e) {
+      setStatus('Camera error: ' + e.message, 'error');
+      return false;
+    }
   }
 }
 
@@ -818,13 +916,40 @@ function updateEmotionPanel() {
   var emotions = STATE.smoothedEmotions;
   var current  = STATE.currentEmotion;
   var conf     = STATE.emotionConfidence;
-  var cfg      = EMOTION_CONFIG[current] || { emoji: '😐', label: current };
+  var cfg      = EMOTION_CONFIG[current] || EMOTION_CONFIG['neutral'];
+  var confPct  = Math.round(conf * 100);
 
-  if (DOM.emotionEmoji) DOM.emotionEmoji.textContent = cfg.emoji;
-  if (DOM.emotionName)  DOM.emotionName.textContent  = cfg.label;
-  if (DOM.emotionConf)  DOM.emotionConf.textContent  = Math.round(conf * 100) + '% confidence';
+  // Update SVG face icon
+  var iconEl = document.getElementById('emotion-svg-icon');
+  if (iconEl) iconEl.innerHTML = getEmotionSVG(cfg.icon, cfg.color);
+
+  // Update label with color
+  var nameEl = document.getElementById('emotion-name');
+  if (nameEl) {
+    nameEl.textContent  = cfg.label.toUpperCase();
+    nameEl.style.color  = cfg.color;
+  }
+
+  // Update description
+  var descEl = document.getElementById('emotion-desc');
+  if (descEl) descEl.textContent = cfg.desc;
+
+  // Update confidence meter bar
+  var confBar  = document.getElementById('emotion-conf-bar');
+  var confText = document.getElementById('emotion-confidence');
+  if (confBar) {
+    confBar.style.width      = confPct + '%';
+    confBar.style.background = cfg.color;
+  }
+  if (confText) confText.textContent = confPct + '% confidence';
+
+  // Update panel background accent
+  var heroEl = document.getElementById('emotion-hero');
+  if (heroEl) heroEl.style.background = cfg.bg;
+
   if (DOM.emotionStatus) DOM.emotionStatus.textContent = '';
 
+  // Update each emotion signal bar
   var keys = ['happy', 'neutral', 'sad', 'angry', 'surprised', 'fearful', 'disgusted'];
   for (var i = 0; i < keys.length; i++) {
     var key   = keys[i];
@@ -832,9 +957,22 @@ function updateEmotionPanel() {
     var pct   = Math.round(val * 100);
     var bar   = document.getElementById('bar-' + key);
     var pctEl = document.getElementById('pct-' + key);
-    if (bar)   bar.style.width   = pct + '%';
+    var rowEl = document.getElementById('row-' + key);
+
+    if (bar) {
+      bar.style.width      = pct + '%';
+      bar.style.background = EMOTION_CONFIG[key] ? EMOTION_CONFIG[key].color : '#00d4f5';
+    }
     if (pctEl) pctEl.textContent = pct + '%';
-    if (bar)   bar.style.opacity = (key === current && conf > CONFIG.EMOTION_MIN_CONFIDENCE) ? '1' : '0.45';
+
+    // Highlight the dominant emotion row
+    if (rowEl) {
+      var isDominant = (key === current && conf > CONFIG.EMOTION_MIN_CONFIDENCE);
+      rowEl.style.opacity    = isDominant ? '1' : '0.45';
+      rowEl.style.transform  = isDominant ? 'translateX(3px)' : 'translateX(0)';
+      rowEl.style.transition = 'all 0.3s ease';
+    }
+    if (bar) bar.style.opacity = '1';
   }
 }
 

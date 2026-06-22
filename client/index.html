@@ -137,29 +137,74 @@
     <!-- ── PANELS COLUMN ─────────────────────── -->
     <div class="panels-col">
 
-      <!-- EMOTION CARD -->
+      <!-- EMOTION CARD — Professional redesign, no emojis -->
       <div class="card" id="emotion-card">
         <div class="card-header">
-          <h2 class="card-title">Emotion</h2>
+          <h2 class="card-title">Emotion Analysis</h2>
           <span class="card-badge badge-ai">AI</span>
         </div>
 
-        <div class="emotion-hero">
-          <span class="emotion-emoji-large" id="emotion-emoji">😐</span>
-          <div>
-            <div class="emotion-name-large" id="emotion-name">Neutral</div>
-            <div class="emotion-conf-text" id="emotion-confidence">—</div>
+        <!-- Hero: SVG face icon + label + description -->
+        <div class="emotion-hero" id="emotion-hero">
+          <div class="emotion-svg-wrap" id="emotion-svg-icon">
+            <!-- SVG injected by JS -->
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="22" stroke="#00d4f5" stroke-width="2" fill="rgba(0,212,245,0.08)"/>
+              <circle cx="17" cy="19" r="2.5" fill="#00d4f5"/>
+              <circle cx="31" cy="19" r="2.5" fill="#00d4f5"/>
+              <line x1="16" y1="30" x2="32" y2="30" stroke="#00d4f5" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="emotion-hero-text">
+            <div class="emotion-name-large" id="emotion-name">NEUTRAL</div>
+            <div class="emotion-desc" id="emotion-desc">Baseline expression</div>
+            <!-- Confidence meter -->
+            <div class="emotion-conf-wrap">
+              <div class="emotion-conf-track">
+                <div class="emotion-conf-bar" id="emotion-conf-bar" style="width:0%"></div>
+              </div>
+              <span class="emotion-conf-text" id="emotion-confidence">0% confidence</span>
+            </div>
           </div>
         </div>
 
+        <!-- Signal bars — one per emotion, no emojis -->
         <div class="emotion-grid">
-          <div class="emotion-row"><span class="er-label">😊 Happy</span>    <div class="er-track"><div class="er-fill fill-happy"     id="bar-happy"     style="width:0%"></div></div><span class="er-pct" id="pct-happy">0%</span></div>
-          <div class="emotion-row"><span class="er-label">😐 Neutral</span>  <div class="er-track"><div class="er-fill fill-neutral"   id="bar-neutral"   style="width:0%"></div></div><span class="er-pct" id="pct-neutral">0%</span></div>
-          <div class="emotion-row"><span class="er-label">😔 Sad</span>      <div class="er-track"><div class="er-fill fill-sad"       id="bar-sad"       style="width:0%"></div></div><span class="er-pct" id="pct-sad">0%</span></div>
-          <div class="emotion-row"><span class="er-label">😠 Angry</span>    <div class="er-track"><div class="er-fill fill-angry"     id="bar-angry"     style="width:0%"></div></div><span class="er-pct" id="pct-angry">0%</span></div>
-          <div class="emotion-row"><span class="er-label">😲 Surprised</span><div class="er-track"><div class="er-fill fill-surprised" id="bar-surprised" style="width:0%"></div></div><span class="er-pct" id="pct-surprised">0%</span></div>
-          <div class="emotion-row"><span class="er-label">😨 Fearful</span>  <div class="er-track"><div class="er-fill fill-fearful"   id="bar-fearful"   style="width:0%"></div></div><span class="er-pct" id="pct-fearful">0%</span></div>
-          <div class="emotion-row"><span class="er-label">🤢 Disgusted</span><div class="er-track"><div class="er-fill fill-disgusted" id="bar-disgusted" style="width:0%"></div></div><span class="er-pct" id="pct-disgusted">0%</span></div>
+          <div class="emotion-row" id="row-happy">
+            <span class="er-label">Happy</span>
+            <div class="er-track"><div class="er-fill" id="bar-happy" style="width:0%;background:#00e676"></div></div>
+            <span class="er-pct" id="pct-happy">0%</span>
+          </div>
+          <div class="emotion-row" id="row-neutral">
+            <span class="er-label">Neutral</span>
+            <div class="er-track"><div class="er-fill" id="bar-neutral" style="width:0%;background:#00d4f5"></div></div>
+            <span class="er-pct" id="pct-neutral">0%</span>
+          </div>
+          <div class="emotion-row" id="row-sad">
+            <span class="er-label">Sad</span>
+            <div class="er-track"><div class="er-fill" id="bar-sad" style="width:0%;background:#7986cb"></div></div>
+            <span class="er-pct" id="pct-sad">0%</span>
+          </div>
+          <div class="emotion-row" id="row-angry">
+            <span class="er-label">Angry</span>
+            <div class="er-track"><div class="er-fill" id="bar-angry" style="width:0%;background:#ff5252"></div></div>
+            <span class="er-pct" id="pct-angry">0%</span>
+          </div>
+          <div class="emotion-row" id="row-surprised">
+            <span class="er-label">Surprised</span>
+            <div class="er-track"><div class="er-fill" id="bar-surprised" style="width:0%;background:#ffd740"></div></div>
+            <span class="er-pct" id="pct-surprised">0%</span>
+          </div>
+          <div class="emotion-row" id="row-fearful">
+            <span class="er-label">Fearful</span>
+            <div class="er-track"><div class="er-fill" id="bar-fearful" style="width:0%;background:#ff6d00"></div></div>
+            <span class="er-pct" id="pct-fearful">0%</span>
+          </div>
+          <div class="emotion-row" id="row-disgusted">
+            <span class="er-label">Disgusted</span>
+            <div class="er-track"><div class="er-fill" id="bar-disgusted" style="width:0%;background:#b2ff59"></div></div>
+            <span class="er-pct" id="pct-disgusted">0%</span>
+          </div>
         </div>
         <p class="card-note" id="emotion-status">Loading emotion model...</p>
       </div>
