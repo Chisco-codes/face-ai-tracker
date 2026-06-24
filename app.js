@@ -1202,7 +1202,24 @@ var AI = {
     AI.conversationDepth++;
 
     if (q.match(/^(hi|hello|hey|good morning|good evening|good afternoon|howdy|what'?s up|sup)\b/)) {
-      return "Hello! I'm Aria, your wellness coach. You're looking " + emotion + " with focus at " + focus + "/100. How are you feeling today?";
+      // Only mention face data if camera is actually running with real readings
+      var cameraActive = STATE.isRunning && STATE.calibDone && STATE.lastEAR > 0.05;
+      if (cameraActive && conf > 0.3) {
+        var greetings = [
+          "Hey! Good to have you here. I can see you right now — you look " + emotion + " and your focus is at " + focus + "/100. How are you actually feeling today?",
+          "Hello! I'm Aria, your wellness coach. Looking at your face right now I can see " + emotion + " energy with focus at " + focus + "/100. What's on your mind?",
+          "Hi there! I can see you clearly. You look " + emotion + " right now with " + Math.round(conf * 100) + "% confidence. How are you doing today?",
+        ];
+        return greetings[AI.conversationDepth % 3];
+      } else {
+        // Camera not open yet — warm natural greeting, no face data
+        var warmGreetings = [
+          "Hey! I'm Aria, your personal wellness coach. I'm really glad you're here. How are you feeling today — what's on your mind?",
+          "Hello! Welcome. I'm Aria and I'm here for you. Whether it's stress, focus, relationships, or just checking in — I've got you. How are you doing?",
+          "Hi! Good to see you. I'm Aria, your wellness coach. Start the camera and I can read your face in real time, or just talk to me — how are you feeling right now?",
+        ];
+        return warmGreetings[AI.conversationDepth % 3];
+      }
     }
     if (q.match(/don'?t feel (good|well|great|okay|fine)|feel (bad|terrible|awful|horrible|low|down|off|weird)|feeling (bad|terrible|low|down|off|rough)/)) {
       AI.lastTopic = 'feeling-bad';
@@ -1340,7 +1357,8 @@ async function sendChatMessage() {
   input.blur();
   addChatMessage('user', text);
   CHAT.lastUserMessageTime = performance.now();
-  CHAT.history.push({ role: 'user', content: text });
+  // Send history WITHOUT current message — server adds it cleanly
+  // Pushing before send caused duplicate messages to OpenAI
   CHAT.isWaiting = true;
   showTypingIndicator();
   var faceData = collectFaceData();
@@ -1368,8 +1386,10 @@ async function sendChatMessage() {
   if (!response) response = AI.answer(text, faceData);
   removeTypingIndicator();
   addChatMessage('ai', response);
+  // Now add both user message and response to history in correct order
+  CHAT.history.push({ role: 'user', content: text });
   CHAT.history.push({ role: 'assistant', content: response });
-  if (CHAT.history.length > 20) CHAT.history.splice(0, 2);
+  if (CHAT.history.length > 24) CHAT.history.splice(0, 2);
   CHAT.isWaiting = false;
 }
 
@@ -1487,15 +1507,33 @@ document.addEventListener('visibilitychange', function() {
 (function() {
   var chatInput = document.getElementById('chat-input');
   if (!chatInput) return;
+
+  // iOS keyboard fix using visualViewport
+  // When keyboard opens, visualViewport shrinks — we scroll input into view
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function() {
+      if (document.activeElement === chatInput) {
+        setTimeout(function() {
+          // Scroll the chat card so input is visible above keyboard
+          chatInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          // Also scroll page to prevent blank space at bottom
+          window.scrollTo(0, document.body.scrollHeight);
+        }, 100);
+      }
+    });
+  }
+
   chatInput.addEventListener('focus', function() {
     setTimeout(function() {
-      chatInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 350);
+      chatInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 400);
   });
+
   chatInput.addEventListener('blur', function() {
+    // Restore scroll position when keyboard closes
     setTimeout(function() {
       window.scrollTo({ top: window.scrollY, behavior: 'instant' });
-    }, 100);
+    }, 150);
   });
 })();
 
