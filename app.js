@@ -9,10 +9,10 @@
 // 1. CONFIG
 // ─────────────────────────────────────────────────────────────
 var CONFIG = {
-  DOT_RADIUS:        2.5,
-  DOT_COLOR:         'rgba(0,229,255,0.55)',
-  EYE_DOT_COLOR:     '#ff3366',
-  EYE_DOT_RADIUS:    5,
+  DOT_RADIUS:        1.2,
+  DOT_COLOR:         'rgba(0,212,245,0.35)',
+  EYE_DOT_COLOR:     'rgba(0,212,245,0.9)',
+  EYE_DOT_RADIUS:    2.5,
   BOX_COLOR:         'rgba(0,229,255,0.4)',
   FPS_INTERVAL:      500,
 
@@ -767,7 +767,7 @@ var ANDROID_MESH_IDX = [
 function drawAndroidMesh(kpts) {
   CTX.save();
   // Draw contour dots
-  CTX.fillStyle = 'rgba(0,212,245,0.75)';
+  CTX.fillStyle = 'rgba(0,212,245,0.4)';
   for (var i = 0; i < ANDROID_MESH_IDX.length; i++) {
     var p = kpts[ANDROID_MESH_IDX[i]];
     if (p) {
@@ -1258,11 +1258,31 @@ var AI = {
       return "Yes, I'm here and working!\n\n• Emotion: " + emotion + " (" + Math.round(conf * 100) + "% confidence)\n• Focus: " + focus + "/100\n• Eye openness: " + ear.toFixed(3) + "\n• Blink rate: " + (bpm > 0 ? bpm + "/min" : "measuring...") + "\n• Session: " + mins + " min\n\nEverything is running. Talk to me about anything.";
     }
 
+    // ── FACE READING — what can you see / how do I look ──────
+    if (q.match(/what (do|did|can) you (see|notice|observe|detect)|how (do|did) i look|what.*my face|reading my face|watching me|see my face|my expression|what.*feel.*now|how.*feel.*now/)) {
+      var eyeDesc = ear < 0.15 ? 'your eyes look quite heavy and tired'
+                  : ear < 0.20 ? 'your eyes are showing a little fatigue'
+                  : 'your eyes are open and alert';
+      var focusDesc = focus >= 75 ? 'strong focus at ' + focus + '/100'
+                    : focus >= 50 ? 'moderate focus at ' + focus + '/100'
+                    : 'low focus at ' + focus + '/100';
+      var blinkDesc = bpm > 0 ? ' Your blink rate is ' + bpm + ' per minute' + (bpm > 22 ? ' — slightly elevated, which can signal fatigue.' : ' — healthy and normal.') : '';
+      return "Right now I can see your face clearly. You appear " + emotion + " with " + Math.round(conf * 100) + "% confidence — " + eyeDesc + " and showing " + focusDesc + "." + blinkDesc + (mins > 0 ? " You have been in this session for " + mins + " minute" + (mins > 1 ? "s" : "") + "." : "") + " How are you feeling on the inside — does that match what I'm seeing?";
+    }
+
+    // Context-aware fallback — uses face data to make response relevant
+    var faceNote = '';
+    if (conf > 0.5 && emotion !== 'neutral') {
+      faceNote = " I can see you look " + emotion + " right now — is that connected to what you just said?";
+    } else if (focus < 50) {
+      faceNote = " I notice your focus is a bit low right now — what's on your mind?";
+    }
+
     var fallbacks = [
-      "I want to make sure I understand you properly. Can you tell me a bit more about what you mean?",
-      "That's interesting — say more. What's behind that for you?",
-      "I hear you. What's the main thing you want help with right now — something you're feeling, thinking, or want to do differently?",
-      "Can you share a bit more context? I want to give you a useful response, not a generic one.",
+      "Tell me more about that." + faceNote,
+      "I'm listening — say more about what you mean." + faceNote,
+      "What's really going on for you right now?" + faceNote,
+      "Help me understand what you're experiencing." + faceNote,
     ];
     return fallbacks[Math.floor(AI.conversationDepth % fallbacks.length)];
   },
