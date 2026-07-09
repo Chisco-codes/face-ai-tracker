@@ -93,4 +93,41 @@ async function paystackWebhook(req, res) {
   }
 }
 
-module.exports = { paystackWebhook, verifySignature };
+
+// ── Checkout: server-initialized transaction ──────────────────
+// Creates a Paystack subscription checkout with the user's anonId
+// stamped in metadata, so the webhook can activate premium
+// automatically. Requires PAYSTACK_SECRET_KEY + PAYSTACK_PLAN_CODE.
+async function createCheckout(anonId, email, callbackUrl) {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const plan = process.env.PAYSTACK_PLAN_CODE;
+  if (!secret || !plan) return { error: 'billing_not_configured', status: 503 };
+  if (!anonId || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return { error: 'Valid email required.', status: 400 };
+  try {
+    const res = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + secret,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email,
+        plan: plan,                    // amount & interval come from the plan
+        metadata: { anonId: anonId },
+        callback_url: callbackUrl || 'https://www.facewellnessai.com',
+      }),
+    });
+    const json = await res.json();
+    if (!json.status || !json.data || !json.data.authorization_url) {
+      console.error('[Billing] initialize failed:', json.message || res.status);
+      return { error: json.message || 'Could not start checkout.', status: 502 };
+    }
+    return { url: json.data.authorization_url, reference: json.data.reference };
+  } catch (e) {
+    console.error('[Billing] initialize error:', e.message);
+    return { error: 'Payment service unreachable.', status: 502 };
+  }
+}
+
+module.exports = { paystackWebhook, verifySignature, createCheckout };

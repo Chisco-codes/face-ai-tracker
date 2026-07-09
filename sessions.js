@@ -99,6 +99,7 @@
         S.plan = r.data.plan;
         S.modes = r.data.modes || [];
         S.paymentUrl = r.data.paymentUrl || PAYSTACK_PAYMENT_URL || '';
+        S.billingReady = !!r.data.billingReady;
       }
       renderButtonBadge();
     }).catch(function () { /* offline — sessions unavailable, chat still works */ });
@@ -146,10 +147,49 @@
     btn.type = 'button';
     btn.className = 'aria-upgrade-btn';
     var payUrl = S.paymentUrl || PAYSTACK_PAYMENT_URL;
-    if (payUrl) {
+    if (S.billingReady) {
+      // Automatic checkout: email → server-initialized Paystack session.
+      // The email is required by Paystack for the receipt.
       btn.textContent = 'Upgrade now';
       btn.addEventListener('click', function () {
-        window.open(payUrl + '?metadata[anonId]=' + encodeURIComponent(S.userId), '_blank', 'noopener');
+        var existing = modal.querySelector('#aria-billing-email');
+        if (!existing) {
+          var wrap = document.createElement('div');
+          wrap.className = 'aria-email-row';
+          wrap.innerHTML =
+            '<input id="aria-billing-email" type="email" inputmode="email" ' +
+            'placeholder="Your email (for your receipt)" autocomplete="email">';
+          modal.insertBefore(wrap, btn);
+          btn.textContent = 'Continue to secure payment';
+          modal.querySelector('#aria-billing-email').focus();
+          return;
+        }
+        var email = existing.value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          existing.classList.add('aria-input-error');
+          existing.focus();
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Preparing secure checkout…';
+        api('/billing/checkout', {
+          method: 'POST',
+          body: JSON.stringify({ userId: S.userId, email: email }),
+        }).then(function (r) {
+          if (r.ok && r.data.url) {
+            btn.textContent = 'Opening Paystack…';
+            window.open(r.data.url, '_blank', 'noopener');
+            btn.textContent = 'Complete payment in the new tab';
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'Try again';
+          }
+        }).catch(function () { btn.disabled = false; btn.textContent = 'Try again'; });
+      });
+    } else if (payUrl) {
+      btn.textContent = 'Upgrade now';
+      btn.addEventListener('click', function () {
+        window.open(payUrl, '_blank', 'noopener');
       });
     } else {
       btn.textContent = 'Join the waitlist';

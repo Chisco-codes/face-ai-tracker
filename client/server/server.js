@@ -272,6 +272,7 @@ app.post('/me', async (req, res) => {
       userId: user._id,
       plan: premium ? 'premium' : 'free',
       paymentUrl: process.env.PAYSTACK_PAYMENT_URL || null,
+      billingReady: !!(process.env.PAYSTACK_SECRET_KEY && process.env.PAYSTACK_PLAN_CODE),
       modes: Object.entries(sessions.SESSION_MODES).map(([key, m]) => ({
         key, name: m.name, premium: m.premium, available: !m.premium || premium,
       })),
@@ -338,6 +339,19 @@ app.get('/session/history', async (req, res) => {
     const userId = req.query.userId;
     if (!userId) return res.status(400).json({ error: 'userId required.' });
     res.json({ sessions: await sessions.history(userId) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── CHECKOUT ──────────────────────────────────────────────────
+app.post('/billing/checkout', async (req, res) => {
+  try {
+    const { userId, email } = req.body;
+    await db.getOrCreateUser(userId);
+    const out = await billing.createCheckout(userId, (email || '').trim().toLowerCase(),
+      'https://www.facewellnessai.com');
+    if (out.error) return res.status(out.status || 400).json(out);
+    console.log('[Billing] Checkout created for ' + userId);
+    res.json({ url: out.url });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

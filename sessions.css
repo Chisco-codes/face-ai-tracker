@@ -168,3 +168,19 @@ body.aria-sleep-dim .video-wrap, body.aria-sleep-dim canvas { filter: brightness
 .aria-perk strong { display: block; font-size: 0.84rem; color: var(--text); }
 .aria-perk span { display: block; font-size: 0.72rem; opacity: 0.6; line-height: 1.45; }
 .aria-premium-note { font-size: 0.68rem; opacity: 0.5; text-align: center; margin: 10px 0 0; line-height: 1.4; }
+
+/* Billing email row in premium modal */
+.aria-email-row { margin: 4px 0 10px; }
+#aria-billing-email {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+#aria-billing-email:focus { border-color: var(--purple); }
+#aria-billing-email.aria-input-error { border-color: var(--red, #ff5252); }
