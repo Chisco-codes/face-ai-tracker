@@ -113,13 +113,39 @@
 
   function onPremiumRequired(data) {
     endLocalSession();
-    systemCard(
-      '✨ <strong>Premium session</strong><br>' +
-      (data && data.message ? data.message : 'This session type needs a premium plan.') +
-      (PAYSTACK_PAYMENT_URL
-        ? '<br><a class="aria-upgrade-link" href="' + PAYSTACK_PAYMENT_URL + '?metadata[anonId]=' + encodeURIComponent(S.userId) + '" target="_blank" rel="noopener">Upgrade now →</a>'
-        : '<br><em>Premium launches soon.</em>')
-    );
+    var container = document.getElementById('chat-messages');
+    if (!container) return;
+    var div = document.createElement('div');
+    div.className = 'chat-msg chat-msg--system aria-upgrade-card';
+    var msg = (data && data.message) ? data.message : 'This session type needs a premium plan.';
+    div.innerHTML =
+      '<p><span class="aria-upgrade-title">✨ Premium — Deep Wellness Sessions</span><br>' +
+      msg + '<br>' +
+      '<span class="aria-upgrade-perks">🌊 Deep Conversations · 🎯 Focus reports · 🌙 Sleep wind-downs · 📖 Saved summaries</span></p>';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'aria-upgrade-btn';
+    if (PAYSTACK_PAYMENT_URL) {
+      btn.textContent = 'Upgrade now →';
+      btn.addEventListener('click', function () {
+        window.open(PAYSTACK_PAYMENT_URL + '?metadata[anonId]=' + encodeURIComponent(S.userId), '_blank', 'noopener');
+      });
+    } else {
+      btn.textContent = '✋ Join the premium waitlist';
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+        api('/premium/interest', { method: 'POST', body: JSON.stringify({ userId: S.userId }) })
+          .then(function (r) {
+            btn.textContent = r.ok ? "🎉 You're on the list — you'll be first to know!" : 'Try again';
+            btn.disabled = r.ok;
+          })
+          .catch(function () { btn.textContent = 'Try again'; btn.disabled = false; });
+      });
+    }
+    div.appendChild(btn);
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
   }
 
   function onSessionInvalid() {

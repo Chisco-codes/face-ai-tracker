@@ -93,6 +93,16 @@ async function setUserPlan(anonId, plan, paystackMeta) {
   return u;
 }
 
+async function markPremiumInterest(anonId) {
+  const c = col('users');
+  const update = { premiumInterestAt: new Date() };
+  if (c) await c.updateOne({ _id: anonId }, { $set: update }, { upsert: true });
+  const u = state.mem.users.get(anonId) || { _id: anonId, plan: 'free', createdAt: new Date() };
+  Object.assign(u, update);
+  state.mem.users.set(anonId, u);
+  return true;
+}
+
 // ── SESSIONS ──────────────────────────────────────────────────
 async function saveSession(session) {
   state.mem.sessions.set(session._id, session);
@@ -160,7 +170,7 @@ function status() {
 
 module.exports = {
   connect, status,
-  getOrCreateUser, setUserPlan, deleteUserData,
+  getOrCreateUser, setUserPlan, deleteUserData, markPremiumInterest,
   saveSession, getSession, listSessionSummaries,
   saveFeedback, readAllFeedback,
 };

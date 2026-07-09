@@ -69,7 +69,13 @@ function initAI() {
 
 // ── FACE CONTEXT (unchanged from v1 — the fixed, unfiltered version) ──
 function buildFaceContext(faceData) {
-  if (!faceData) return '';
+  if (!faceData || typeof faceData !== 'object') {
+    return '[CAMERA STATUS: OFF]\n'
+      + 'You CANNOT see the user right now — the camera is not running.\n'
+      + 'NEVER claim to see, sense, or notice anything about their face, eyes, focus or energy.\n'
+      + 'If they ask what you see, warmly say the camera is off and invite them to tap Start Detection.\n'
+      + '[END CAMERA STATUS]\n\n';
+  }
   const emotion = faceData.emotion   || 'neutral';
   const focus   = faceData.focusScore || 0;
   // NEVER filter out face data — always send it so Aria can answer
@@ -86,6 +92,11 @@ function buildFaceContext(faceData) {
                  : 'low (' + focus + '/100)';
   return '[REAL-TIME FACE ANALYSIS — use naturally ONLY if relevant]\n'
     + 'Detected emotion: ' + emotion + ' (' + conf + '% confidence)\n'
+    + (faceData.undertone
+        ? 'Emotional undertone: a subtle trace of ' + faceData.undertone
+          + ' (' + (faceData.undertoneStrength || 0) + '%) beneath the surface — '
+          + 'worth gently acknowledging if the conversation touches feelings, never diagnosing.\n'
+        : '')
     + 'Focus level: ' + focusLvl + '\n'
     + 'Eye state: ' + eyeState + ' (EAR: ' + ear + ')\n'
     + 'Blink rate: ' + (bpm > 0 ? bpm + '/min (normal 12-20)' : 'not yet measured') + '\n'
@@ -292,6 +303,20 @@ app.get('/session/history', async (req, res) => {
     const userId = req.query.userId;
     if (!userId) return res.status(400).json({ error: 'userId required.' });
     res.json({ sessions: await sessions.history(userId) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── PREMIUM WAITLIST ──────────────────────────────────────────
+// Pre-launch: captures who wants premium, straight into the users
+// collection. Your launch list, building itself.
+app.post('/premium/interest', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId required.' });
+    await db.getOrCreateUser(userId);
+    await db.markPremiumInterest(userId);
+    console.log('[Premium] ✋ Waitlist signup: ' + userId);
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

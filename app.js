@@ -43,7 +43,14 @@ var CONFIG = {
   EMOTION_SMOOTH:         0.80,
   EMOTION_MIN_CONFIDENCE: 0.05,
   EMOTION_VOTE_WINDOW:    12,
-  EMOTION_VOTE_THRESHOLD: 0.60,
+  EMOTION_VOTE_THRESHOLD: 0.50,   // was 0.60 — a real emotion now wins with 6/12 frames
+  // Neutral dampening: FER-style models over-report neutral on resting
+  // faces, drowning out genuine subtle emotions. We discount neutral's
+  // probability before picking each frame's winner so real signals
+  // (sad 0.2 vs neutral 0.7) can surface. Display bars stay honest/raw.
+  EMOTION_NEUTRAL_DAMP:   0.35,
+  EMOTION_FRAME_GATE:     0.22,   // was 0.45 — min damped prob to count a non-neutral vote
+  EMOTION_UNDERTONE_MIN:  0.08,   // weakest secondary signal worth mentioning
 };
 
 
@@ -166,6 +173,7 @@ var STATE = {
   emotionConfidence:  0,
   emotionVoteHistory: [],
   confirmedEmotion:   'neutral',
+  emotionUndertone:   null,
 
   smoothFocus:      50,
   lastEAR:          0.19,
@@ -334,12 +342,18 @@ function smoothEmotions(newExpressions) {
     );
   }
 
+  // ── Frame winner with NEUTRAL DAMPENING ────────────────────
+  // Neutral's raw probability is discounted so genuine subtle emotions
+  // can compete. Raw values still drive the bars — this only affects
+  // which emotion gets the vote.
   var frameWinner = 'neutral', frameMax = 0;
   for (var k in newExpressions) {
-    if (newExpressions[k] > frameMax) { frameMax = newExpressions[k]; frameWinner = k; }
+    var p = newExpressions[k] * (k === 'neutral' ? CONFIG.EMOTION_NEUTRAL_DAMP : 1);
+    if (p > frameMax) { frameMax = p; frameWinner = k; }
   }
-
-  STATE.emotionVoteHistory.push(frameMax > 0.45 ? frameWinner : 'neutral');
+  STATE.emotionVoteHistory.push(
+    (frameWinner !== 'neutral' && frameMax < CONFIG.EMOTION_FRAME_GATE) ? 'neutral' : frameWinner
+  );
   if (STATE.emotionVoteHistory.length > CONFIG.EMOTION_VOTE_WINDOW)
     STATE.emotionVoteHistory.shift();
 
@@ -357,6 +371,21 @@ function smoothEmotions(newExpressions) {
 
   STATE.currentEmotion    = STATE.confirmedEmotion;
   STATE.emotionConfidence = STATE.smoothedEmotions[STATE.currentEmotion] || 0;
+
+  // ── Undertone: the strongest signal BENEATH the confirmed emotion ──
+  // This is what makes the app feel perceptive: "Neutral, with a hint
+  // of sadness." Fed to the UI and to Aria.
+  var underWinner = null, underMax = 0;
+  for (var uk in STATE.smoothedEmotions) {
+    if (uk === STATE.currentEmotion || uk === 'neutral') continue;
+    if (STATE.smoothedEmotions[uk] > underMax) {
+      underMax = STATE.smoothedEmotions[uk];
+      underWinner = uk;
+    }
+  }
+  STATE.emotionUndertone = (underMax >= CONFIG.EMOTION_UNDERTONE_MIN)
+    ? { emotion: underWinner, strength: underMax }
+    : null;
 }
 
 function emotionToFocusComponent(emotion, confidence) {
@@ -954,9 +983,17 @@ function updateEmotionPanel() {
     nameEl.style.color  = cfg.color;
   }
 
-  // Update description
+  // Update description — with undertone when a secondary signal exists
   var descEl = document.getElementById('emotion-desc');
-  if (descEl) descEl.textContent = cfg.desc;
+  if (descEl) {
+    var d = cfg.desc;
+    if (STATE.emotionUndertone && EMOTION_CONFIG[STATE.emotionUndertone.emotion]) {
+      var uCfg = EMOTION_CONFIG[STATE.emotionUndertone.emotion];
+      var uPct = Math.round(STATE.emotionUndertone.strength * 100);
+      d += ' · hint of ' + uCfg.label.toLowerCase() + ' (' + uPct + '%)';
+    }
+    descEl.textContent = d;
+  }
 
   // Update confidence meter bar
   var confBar  = document.getElementById('emotion-conf-bar');
@@ -1148,6 +1185,8 @@ function collectFaceData() {
     ? Math.round(STATE.blinkTotal / elapsedMin) : 0;
   return {
     emotion:           STATE.currentEmotion,
+    undertone:         STATE.emotionUndertone ? STATE.emotionUndertone.emotion : null,
+    undertoneStrength: STATE.emotionUndertone ? Math.round(STATE.emotionUndertone.strength * 100) : 0,
     emotionConfidence: STATE.emotionConfidence,
     focusScore:        Math.round(STATE.smoothFocus),
     blinkRate:         bpm,
@@ -1330,12 +1369,25 @@ var AI = {
 };
 
 
+// ── Camera-state truth ────────────────────────────────────────
+// The server must NEVER receive face data unless the camera is truly
+// running with real calibrated readings. Default/stale values (EAR 0,
+// focus 50) made Aria "see" fatigue with the camera off — the #1
+// believability bug. liveFaceData() is what goes to the server.
+function isCameraLive() {
+  return !!(STATE.isRunning && STATE.calibDone && STATE.lastEAR > 0.05);
+}
+function liveFaceData() {
+  return isCameraLive() ? collectFaceData() : null;
+}
+
+
 async function runAnalysis() {
   if (CHAT.isWaiting) return;
   if (CHAT.rateLimitedUntil > performance.now()) return;
   CHAT.isWaiting = true;
   showTypingIndicator();
-  var faceData = collectFaceData();
+  var faceData = liveFaceData();
   var response = null;
 
   if (CHAT.serverOnline) {
@@ -1385,7 +1437,8 @@ async function sendChatMessage() {
   // Pushing before send caused duplicate messages to OpenAI
   CHAT.isWaiting = true;
   showTypingIndicator();
-  var faceData = collectFaceData();
+  var faceData = liveFaceData();          // null when camera is off — server tells Aria honestly
+  var localFaceData = collectFaceData();  // offline engine keeps its own camera-aware logic
   var response = null;
 
   if (CHAT.serverOnline && CHAT.rateLimitedUntil <= performance.now()) {
@@ -1417,7 +1470,7 @@ async function sendChatMessage() {
     }
   }
 
-  if (!response) response = AI.answer(text, faceData);
+  if (!response) response = AI.answer(text, localFaceData);
   removeTypingIndicator();
   addChatMessage('ai', response);
   // Now add both user message and response to history in correct order
