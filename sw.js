@@ -8,7 +8,7 @@
 // ─ Cache-first for app shell, network-first for AI/CDN
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME    = 'face-ai-tracker-v8';   // ← bumped from v3
+const CACHE_NAME    = 'face-ai-tracker-v9';   // ← bumped from v3
 const CACHE_TIMEOUT = 5000;
 
 const CORE_FILES = [
@@ -23,17 +23,17 @@ const CORE_FILES = [
 
 // ── INSTALL ──────────────────────────────────────────────────
 self.addEventListener('install', function(event) {
-  console.log('[SW v8] Installing...');
+  console.log('[SW v9] Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
-      console.log('[SW v8] Caching core files');
+      console.log('[SW v9] Caching core files');
       // addAll can fail if one file is missing — use individual puts
       return Promise.allSettled(
         CORE_FILES.map(function(url) {
           return fetch(url).then(function(response) {
             if (response.ok) return cache.put(url, response);
           }).catch(function(e) {
-            console.warn('[SW v8] Could not cache:', url, e.message);
+            console.warn('[SW v9] Could not cache:', url, e.message);
           });
         })
       );
@@ -41,7 +41,7 @@ self.addEventListener('install', function(event) {
       // Do NOT call self.skipWaiting() here automatically —
       // instead wait for the SKIP_WAITING message from app.js
       // This prevents the "old model" prompt on Android
-      console.log('[SW v8] Install complete — waiting for activation signal');
+      console.log('[SW v9] Install complete — waiting for activation signal');
     })
   );
 });
@@ -58,14 +58,14 @@ self.addEventListener('message', function(event) {
 
 // ── ACTIVATE ─────────────────────────────────────────────────
 self.addEventListener('activate', function(event) {
-  console.log('[SW v8] Activating...');
+  console.log('[SW v9] Activating...');
   event.waitUntil(
     caches.keys().then(function(cacheNames) {
       return Promise.all(
         cacheNames
           .filter(function(name) { return name !== CACHE_NAME; })
           .map(function(name) {
-            console.log('[SW v8] Deleting old cache:', name);
+            console.log('[SW v9] Deleting old cache:', name);
             return caches.delete(name);
           })
       );

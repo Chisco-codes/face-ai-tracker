@@ -787,33 +787,62 @@ async function detectionLoop() {
 function drawFaceMesh(kpts) {
   CTX.save();
 
-  // All 468 dots — small, clean
-  // Resolution-aware dot size: mobile canvases are 320px wide but CSS-
-  // stretched to full screen, which inflated every dot ~2x into a thick
-  // mask. Scale radii to the canvas so the mesh looks equally fine
-  // everywhere — elegant scan lines, not face paint.
+  // ── Contour rendering — how the big products do it ──────────
+  // Instead of a 468-dot cloud, we stroke the face's meaningful
+  // lines (oval, brows, eyes, lips) with a faint constellation
+  // behind them. Reads as a precision instrument, not face paint.
   var MESH_SCALE = Math.max(0.45, Math.min(1, CTX.canvas.width / 640));
-  CTX.fillStyle = CONFIG.DOT_COLOR;
-  for (var i = 0; i < kpts.length; i++) {
+  var LW = Math.max(0.7, 1.1 * MESH_SCALE);
+
+  function stroke(indices, color, width, close) {
     CTX.beginPath();
-    CTX.arc(kpts[i].x, kpts[i].y, CONFIG.DOT_RADIUS * MESH_SCALE, 0, Math.PI * 2);
+    var started = false;
+    for (var i = 0; i < indices.length; i++) {
+      var p = kpts[indices[i]];
+      if (!p) continue;
+      if (!started) { CTX.moveTo(p.x, p.y); started = true; }
+      else CTX.lineTo(p.x, p.y);
+    }
+    if (!started) return;
+    if (close) CTX.closePath();
+    CTX.strokeStyle = color;
+    CTX.lineWidth   = width;
+    CTX.lineJoin    = 'round';
+    CTX.lineCap     = 'round';
+    CTX.stroke();
+  }
+
+  // Faint constellation: every 5th mesh point, barely-there
+  CTX.fillStyle = 'rgba(0,212,245,0.10)';
+  for (var i = 0; i < kpts.length; i += 5) {
+    CTX.beginPath();
+    CTX.arc(kpts[i].x, kpts[i].y, 0.8 * MESH_SCALE, 0, Math.PI * 2);
     CTX.fill();
   }
 
-  // Eye dots — highlighted in accent red
-  var eyeIdx = LM.RIGHT_EYE.concat(LM.LEFT_EYE);
-  CTX.fillStyle = CONFIG.EYE_DOT_COLOR;
-  for (var j = 0; j < eyeIdx.length; j++) {
-    var p = kpts[eyeIdx[j]];
-    if (p) {
-      CTX.beginPath();
-      CTX.arc(p.x, p.y, CONFIG.EYE_DOT_RADIUS * MESH_SCALE, 0, Math.PI * 2);
-      CTX.fill();
-    }
-  }
+  // Face oval — the soft frame
+  stroke(MESH_CONTOURS.FACE_OVAL, 'rgba(0,212,245,0.28)', LW, true);
+  // Eyebrows — light
+  stroke(MESH_CONTOURS.RIGHT_BROW, 'rgba(0,212,245,0.40)', LW, false);
+  stroke(MESH_CONTOURS.LEFT_BROW,  'rgba(0,212,245,0.40)', LW, false);
+  // Eyes — the focal point, brightest
+  stroke(MESH_CONTOURS.RIGHT_EYE_RING, 'rgba(0,229,255,0.85)', LW * 1.15, true);
+  stroke(MESH_CONTOURS.LEFT_EYE_RING,  'rgba(0,229,255,0.85)', LW * 1.15, true);
+  // Lips — subtle
+  stroke(MESH_CONTOURS.LIPS_OUTER, 'rgba(0,212,245,0.32)', LW, true);
 
   CTX.restore();
 }
+
+// MediaPipe FaceMesh canonical contour indices
+var MESH_CONTOURS = {
+  FACE_OVAL: [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109],
+  LIPS_OUTER: [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146],
+  RIGHT_EYE_RING: [33,7,163,144,145,153,154,155,133,173,157,158,159,160,161,246],
+  LEFT_EYE_RING: [263,249,390,373,374,380,381,382,362,398,384,385,386,387,388,466],
+  RIGHT_BROW: [70,63,105,66,107],
+  LEFT_BROW: [300,293,334,296,336],
+};
 
 // Android mesh: face oval contour + eyes + nose tip + mouth corners
 // ~60 key points instead of 468 — fast enough for 3fps Android
@@ -1767,6 +1796,38 @@ window.addEventListener('beforeunload', function() {
 });
 
 // ── SERVICE WORKER ─────────────────────────────────────────
+// ── Compact camera mode ───────────────────────────────────────
+// Shrinks the video to a corner card so the conversation becomes the
+// centre of the app. Uniform scaling keeps the mesh overlay perfectly
+// aligned. Preference persists across visits.
+(function initCompactCamera() {
+  function setup() {
+    var wrap = document.querySelector('.video-wrapper');
+    if (!wrap || document.getElementById('video-compact-btn')) return;
+    var btn = document.createElement('button');
+    btn.id = 'video-compact-btn';
+    btn.type = 'button';
+    btn.className = 'video-compact-btn';
+    btn.setAttribute('aria-label', 'Toggle compact camera');
+    function apply(compactOn) {
+      wrap.classList.toggle('video-compact', compactOn);
+      btn.innerHTML = compactOn
+        ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 15H4v5M15 9h5V4"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 15v5h-5"/></svg>';
+      try { localStorage.setItem('aria_video_compact', compactOn ? '1' : '0'); } catch (e) {}
+    }
+    btn.addEventListener('click', function () {
+      apply(!wrap.classList.contains('video-compact'));
+    });
+    wrap.appendChild(btn);
+    var saved = false;
+    try { saved = localStorage.getItem('aria_video_compact') === '1'; } catch (e) {}
+    apply(saved);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
+  else setup();
+})();
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js')
