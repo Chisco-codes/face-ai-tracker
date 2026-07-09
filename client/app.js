@@ -9,10 +9,10 @@
 // 1. CONFIG
 // ─────────────────────────────────────────────────────────────
 var CONFIG = {
-  DOT_RADIUS:        1.2,
-  DOT_COLOR:         'rgba(0,212,245,0.35)',
-  EYE_DOT_COLOR:     'rgba(0,212,245,0.9)',
-  EYE_DOT_RADIUS:    2.5,
+  DOT_RADIUS:        1.0,
+  DOT_COLOR:         'rgba(0,212,245,0.22)',
+  EYE_DOT_COLOR:     'rgba(0,212,245,0.7)',
+  EYE_DOT_RADIUS:    1.8,
   BOX_COLOR:         'rgba(0,229,255,0.4)',
   FPS_INTERVAL:      500,
 
@@ -163,6 +163,7 @@ var STATE = {
   blinkState:         'OPEN',
   blinkFrameCount:    0,
   blinkTotal:         0,
+  lastBlinkAt:        0,
   sessionStart:       0,
 
   framesSinceEmotion: 0,
@@ -423,7 +424,14 @@ function computeMetrics(keypoints) {
     };
   }
 
-  // ── Blink state machine — now uses correctly-scoped thr ──
+  // ── Blink state machine — with hysteresis + refractory period ──
+  // Two over-counting causes fixed here:
+  // 1. HYSTERESIS: EAR jitter around the threshold (blur, low light)
+  //    used to register several blinks per real blink. Now the eye
+  //    must clearly RE-OPEN (5% above threshold) before a blink counts;
+  //    in the narrow dead-zone between, we hold state and wait.
+  // 2. REFRACTORY: humans physically can't blink twice in <300ms —
+  //    time-based so it behaves identically at 30fps and 12fps.
   if (ear < thr) {
     STATE.blinkFrameCount++;
     if (STATE.blinkState === 'OPEN' && STATE.blinkFrameCount >= 2) {
@@ -432,14 +440,18 @@ function computeMetrics(keypoints) {
     if (STATE.blinkState === 'CLOSING' && STATE.blinkFrameCount >= CONFIG.BLINK_FRAMES) {
       STATE.blinkState = 'CLOSED';
     }
-  } else {
+  } else if (ear > thr * 1.05) {
     if (STATE.blinkState === 'CLOSED' ||
        (STATE.blinkState === 'CLOSING' && STATE.blinkFrameCount >= CONFIG.BLINK_FRAMES)) {
-      STATE.blinkTotal++;
+      if (!STATE.lastBlinkAt || now - STATE.lastBlinkAt > 300) {
+        STATE.blinkTotal++;
+        STATE.lastBlinkAt = now;
+      }
     }
     STATE.blinkState      = 'OPEN';
     STATE.blinkFrameCount = 0;
   }
+  // else: dead-zone between thr and thr*1.05 — hold current state
 
   // BPM
   var elapsedMs  = now - STATE.sessionStart;
@@ -776,10 +788,15 @@ function drawFaceMesh(kpts) {
   CTX.save();
 
   // All 468 dots — small, clean
+  // Resolution-aware dot size: mobile canvases are 320px wide but CSS-
+  // stretched to full screen, which inflated every dot ~2x into a thick
+  // mask. Scale radii to the canvas so the mesh looks equally fine
+  // everywhere — elegant scan lines, not face paint.
+  var MESH_SCALE = Math.max(0.45, Math.min(1, CTX.canvas.width / 640));
   CTX.fillStyle = CONFIG.DOT_COLOR;
   for (var i = 0; i < kpts.length; i++) {
     CTX.beginPath();
-    CTX.arc(kpts[i].x, kpts[i].y, CONFIG.DOT_RADIUS, 0, Math.PI * 2);
+    CTX.arc(kpts[i].x, kpts[i].y, CONFIG.DOT_RADIUS * MESH_SCALE, 0, Math.PI * 2);
     CTX.fill();
   }
 
@@ -790,7 +807,7 @@ function drawFaceMesh(kpts) {
     var p = kpts[eyeIdx[j]];
     if (p) {
       CTX.beginPath();
-      CTX.arc(p.x, p.y, CONFIG.EYE_DOT_RADIUS, 0, Math.PI * 2);
+      CTX.arc(p.x, p.y, CONFIG.EYE_DOT_RADIUS * MESH_SCALE, 0, Math.PI * 2);
       CTX.fill();
     }
   }
@@ -820,12 +837,12 @@ var ANDROID_MESH_IDX = [
 function drawAndroidMesh(kpts) {
   CTX.save();
   // Draw contour dots
-  CTX.fillStyle = 'rgba(0,212,245,0.4)';
+  CTX.fillStyle = 'rgba(0,212,245,0.25)';
   for (var i = 0; i < ANDROID_MESH_IDX.length; i++) {
     var p = kpts[ANDROID_MESH_IDX[i]];
     if (p) {
       CTX.beginPath();
-      CTX.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+      CTX.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
       CTX.fill();
     }
   }
@@ -836,7 +853,7 @@ function drawAndroidMesh(kpts) {
     var ep = kpts[eyeIdx[j]];
     if (ep) {
       CTX.beginPath();
-      CTX.arc(ep.x, ep.y, CONFIG.EYE_DOT_RADIUS, 0, Math.PI * 2);
+      CTX.arc(ep.x, ep.y, 1.8, 0, Math.PI * 2);
       CTX.fill();
     }
   }
@@ -1063,6 +1080,7 @@ async function init() {
       STATE.blinkState         = 'OPEN';
       STATE.blinkFrameCount    = 0;
       STATE.blinkTotal         = 0;
+      STATE.lastBlinkAt        = 0;
       STATE.sessionStart       = performance.now();
       STATE.smoothFocus        = 50;
       STATE.isRunning          = true;
@@ -1596,17 +1614,19 @@ document.addEventListener('visibilitychange', function() {
   if (!chatInput) return;
 
   // iOS keyboard fix using visualViewport
-  // When keyboard opens, visualViewport shrinks — we scroll input into view
+  // The old handler smooth-scrolled on EVERY resize event during the
+  // keyboard animation AND force-scrolled the page bottom — the two
+  // fought each other, which is what made the screen shake while
+  // typing. Now: wait for the keyboard animation to settle, then do
+  // exactly one instant, minimal scroll.
   if (window.visualViewport) {
+    var kbSettleTimer = null;
     window.visualViewport.addEventListener('resize', function() {
-      if (document.activeElement === chatInput) {
-        setTimeout(function() {
-          // Scroll the chat card so input is visible above keyboard
-          chatInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          // Also scroll page to prevent blank space at bottom
-          window.scrollTo(0, document.body.scrollHeight);
-        }, 100);
-      }
+      if (document.activeElement !== chatInput) return;
+      clearTimeout(kbSettleTimer);
+      kbSettleTimer = setTimeout(function() {
+        chatInput.scrollIntoView({ block: 'nearest' });
+      }, 250);
     });
   }
 

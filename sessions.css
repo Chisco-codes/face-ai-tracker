@@ -154,3 +154,17 @@ body.aria-sleep-dim .video-wrap, body.aria-sleep-dim canvas { filter: brightness
 }
 .aria-upgrade-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(167,139,250,0.35); }
 .aria-upgrade-btn:disabled { opacity: 0.85; cursor: default; background: var(--green); }
+
+/* ── v2.1 polish: SVG icons + premium modal ────────────────── */
+.aria-sessions-btn { display: inline-flex; align-items: center; gap: 5px; }
+.aria-sessions-btn svg { width: 13px; height: 13px; }
+.aria-mode-icon svg { width: 22px; height: 22px; color: var(--accent); }
+
+.aria-premium-modal { max-width: 420px; }
+.aria-premium-lead { font-size: 0.82rem; line-height: 1.5; opacity: 0.75; margin: 4px 0 14px; }
+.aria-premium-perks { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.aria-perk { display: flex; align-items: flex-start; gap: 12px; }
+.aria-perk svg { width: 20px; height: 20px; color: var(--purple); flex-shrink: 0; margin-top: 2px; }
+.aria-perk strong { display: block; font-size: 0.84rem; color: var(--text); }
+.aria-perk span { display: block; font-size: 0.72rem; opacity: 0.6; line-height: 1.45; }
+.aria-premium-note { font-size: 0.68rem; opacity: 0.5; text-align: center; margin: 10px 0 0; line-height: 1.4; }

@@ -113,39 +113,62 @@
 
   function onPremiumRequired(data) {
     endLocalSession();
-    var container = document.getElementById('chat-messages');
-    if (!container) return;
-    var div = document.createElement('div');
-    div.className = 'chat-msg chat-msg--system aria-upgrade-card';
-    var msg = (data && data.message) ? data.message : 'This session type needs a premium plan.';
-    div.innerHTML =
-      '<p><span class="aria-upgrade-title">✨ Premium — Deep Wellness Sessions</span><br>' +
-      msg + '<br>' +
-      '<span class="aria-upgrade-perks">🌊 Deep Conversations · 🎯 Focus reports · 🌙 Sleep wind-downs · 📖 Saved summaries</span></p>';
+    closeModal();
+    var overlay = document.createElement('div');
+    overlay.id = 'aria-modal-overlay';
+    overlay.className = 'aria-modal-overlay';
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+
+    var modal = document.createElement('div');
+    modal.className = 'aria-modal aria-premium-modal';
+    modal.innerHTML =
+      '<div class="aria-modal-head"><h3>Premium</h3>' +
+      '<button class="aria-modal-close" type="button">✕</button></div>' +
+      '<p class="aria-premium-lead">' +
+      ((data && data.message) ? data.message : 'This session type is part of the premium plan.') +
+      '</p>' +
+      '<div class="aria-premium-perks">' +
+        '<div class="aria-perk">' + ICON.deep +
+          '<div><strong>Deep Conversations</strong><span>Structured 20–30 min sessions with real depth.</span></div></div>' +
+        '<div class="aria-perk">' + ICON.focus +
+          '<div><strong>Focus reports</strong><span>Your attention, measured and mapped over each session.</span></div></div>' +
+        '<div class="aria-perk">' + ICON.sleep +
+          '<div><strong>Sleep wind-downs</strong><span>Guided evening sessions that ease you toward rest.</span></div></div>' +
+        '<div class="aria-perk">' + ICON.spark +
+          '<div><strong>Saved summaries</strong><span>Every session distilled, kept, and yours to revisit.</span></div></div>' +
+      '</div>';
+
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'aria-upgrade-btn';
     if (PAYSTACK_PAYMENT_URL) {
-      btn.textContent = 'Upgrade now →';
+      btn.textContent = 'Upgrade now';
       btn.addEventListener('click', function () {
         window.open(PAYSTACK_PAYMENT_URL + '?metadata[anonId]=' + encodeURIComponent(S.userId), '_blank', 'noopener');
       });
     } else {
-      btn.textContent = '✋ Join the premium waitlist';
+      btn.textContent = 'Join the waitlist';
       btn.addEventListener('click', function () {
         btn.disabled = true;
         btn.textContent = 'Saving…';
         api('/premium/interest', { method: 'POST', body: JSON.stringify({ userId: S.userId }) })
           .then(function (r) {
-            btn.textContent = r.ok ? "🎉 You're on the list — you'll be first to know!" : 'Try again';
+            btn.textContent = r.ok ? "You're on the list — you'll be the first to know." : 'Try again';
             btn.disabled = r.ok;
           })
           .catch(function () { btn.textContent = 'Try again'; btn.disabled = false; });
       });
     }
-    div.appendChild(btn);
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+    modal.appendChild(btn);
+
+    var note = document.createElement('p');
+    note.className = 'aria-premium-note';
+    note.textContent = 'Aria is a wellness coach, not a licensed therapist. Crisis support is always free, in every plan.';
+    modal.appendChild(note);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    modal.querySelector('.aria-modal-close').addEventListener('click', closeModal);
   }
 
   function onSessionInvalid() {
@@ -164,11 +187,19 @@
     container.scrollTop = container.scrollHeight;
   }
 
+  var ICON = {
+    checkin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>',
+    deep:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 10c2.5-3 5.5-3 8 0s5.5 3 8 0"/><path d="M3 15c2.5-3 5.5-3 8 0s5.5 3 8 0"/></svg>',
+    focus:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
+    sleep:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M20 13.5A8 8 0 1 1 10.5 4a6.5 6.5 0 0 0 9.5 9.5z"/></svg>',
+    spark:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>',
+  };
+
   var MODE_META = {
-    checkin: { icon: '☀️', desc: '3–5 min · one focused reflection and one practical suggestion.' },
-    deep:    { icon: '🌊', desc: '20–30 min · structured deep conversation with a saved summary.' },
-    focus:   { icon: '🎯', desc: '25 min · Aria stays quiet and nudges only when your focus dips.' },
-    sleep:   { icon: '🌙', desc: '10 min · slow wind-down with guided breathing. Screen dims.' },
+    checkin: { icon: ICON.checkin, desc: '3-5 min - one focused reflection, one practical step.' },
+    deep:    { icon: ICON.deep,    desc: '20-30 min - structured deep conversation with a saved summary.' },
+    focus:   { icon: ICON.focus,   desc: '25 min - Aria stays quiet, nudging only when your focus dips.' },
+    sleep:   { icon: ICON.sleep,   desc: '10 min - slow wind-down with guided breathing. Screen dims.' },
   };
 
   function injectButton() {
@@ -178,14 +209,14 @@
     btn.id = 'aria-sessions-btn';
     btn.className = 'aria-sessions-btn';
     btn.type = 'button';
-    btn.innerHTML = '🧘 Sessions';
+    btn.innerHTML = ICON.spark + '<span>Sessions</span>';
     btn.addEventListener('click', openModal);
     headerRight.insertBefore(btn, headerRight.firstChild);
   }
 
   function renderButtonBadge() {
     var btn = document.getElementById('aria-sessions-btn');
-    if (btn) btn.innerHTML = '🧘 Sessions' + (S.plan === 'premium' ? ' <span class="aria-pro">PRO</span>' : '');
+    if (btn) btn.innerHTML = ICON.spark + '<span>Sessions</span>' + (S.plan === 'premium' ? ' <span class="aria-pro">PRO</span>' : '');
   }
 
   function openModal() {
@@ -204,7 +235,7 @@
       'professional. Sessions are for reflection, stress relief and emotional support — not diagnosis ' +
       'or treatment. If you are in crisis, please reach out to a professional or local emergency services.</p>' +
       '<div class="aria-mode-grid" id="aria-mode-grid"></div>' +
-      '<button class="aria-history-btn" type="button" id="aria-history-btn">📖 My past session summaries</button>';
+      '<button class="aria-history-btn" type="button" id="aria-history-btn">View my past session summaries</button>';
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
     modal.querySelector('.aria-modal-close').addEventListener('click', closeModal);
@@ -218,7 +249,7 @@
       { key: 'sleep', name: 'Sleep Wind-Down', premium: true, available: false },
     ];
     modes.forEach(function (m) {
-      var meta = MODE_META[m.key] || { icon: '🧘', desc: '' };
+      var meta = MODE_META[m.key] || { icon: ICON.spark, desc: '' };
       var card = document.createElement('button');
       card.type = 'button';
       card.className = 'aria-mode-card' + (m.available ? '' : ' aria-mode-locked');
@@ -248,7 +279,7 @@
       S.active = { sessionId: r.data.sessionId, mode: r.data.mode, modeName: r.data.modeName };
       showBanner();
       if (mode.key === 'sleep') document.body.classList.add('aria-sleep-dim');
-      systemCard('🧘 <strong>' + r.data.modeName + '</strong> started. Everything you say now is part of this ' +
+      systemCard('<strong>' + r.data.modeName + '</strong> started. Everything you say now is part of this ' +
         'session — Aria has deeper context here, and you\'ll get a summary when you end it.');
       var input = document.getElementById('chat-input');
       if (input) input.focus();
@@ -310,7 +341,7 @@
 
   function renderSummary(session) {
     systemCard(
-      '<span class="aria-summary-title">📋 ' + session.modeName + ' — Session Summary</span><br>' +
+      '<span class="aria-summary-title">' + session.modeName + ' — Summary</span><br>' +
       mdLite(session.summary) +
       '<br><span class="aria-summary-meta">' + session.exchangeCount + ' exchanges · ' +
       session.metrics.samples + ' face-metric samples · saved to your history</span>'

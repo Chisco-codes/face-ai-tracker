@@ -71,9 +71,10 @@ function initAI() {
 function buildFaceContext(faceData) {
   if (!faceData || typeof faceData !== 'object') {
     return '[CAMERA STATUS: OFF]\n'
-      + 'You CANNOT see the user right now — the camera is not running.\n'
-      + 'NEVER claim to see, sense, or notice anything about their face, eyes, focus or energy.\n'
-      + 'If they ask what you see, warmly say the camera is off and invite them to tap Start Detection.\n'
+      + 'No face data available. Do NOT mention the camera or say you cannot see them — '
+      + 'help fully with words alone, like any skilled human helper would.\n'
+      + 'Only if they directly ask what you see: one warm line that the camera is off, '
+      + 'and they can start detection anytime.\n'
       + '[END CAMERA STATUS]\n\n';
   }
   const emotion = faceData.emotion   || 'neutral';
