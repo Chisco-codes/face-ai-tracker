@@ -212,7 +212,7 @@ app.post('/analyze', async (req, res) => {
 // ── FREE CHAT (v1-compatible + crisis layer) ──────────────────
 app.post('/chat', async (req, res) => {
   try {
-    const { message, faceData, history } = req.body;
+    const { message, faceData, history, userId } = req.body;
     if (!message) return res.status(400).json({ error: 'Message required.' });
 
     // CRISIS CHECK FIRST — before AI availability, before anything.
@@ -230,7 +230,27 @@ app.post('/chat', async (req, res) => {
       ...(history || []).filter(h => h.content && h.content.trim()).slice(-12),
       { role: 'user', content: message },
     ];
-    const result = await callAI(messages, faceData, false);
+
+    // ── Long-term memory: Aria recalls this person's past sessions ──
+    // Their two most recent Deep Wellness summaries become quiet
+    // context — she knows them, without reciting it back.
+    let memory = null;
+    if (userId) {
+      try {
+        const past = await db.listSessionSummaries(userId, 2);
+        if (past && past.length) {
+          memory = '[WHAT YOU REMEMBER ABOUT THIS PERSON — from their past sessions with you]\n'
+            + past.map(p => '• (' + (p.modeName || p.mode) + ', '
+                + new Date(p.startedAt).toDateString() + ') '
+                + String(p.summary || '').replace(/\s+/g, ' ').substring(0, 320)).join('\n')
+            + '\nUse this memory the way a good friend would: naturally, when relevant '
+            + '("how did that intention from last time go?"). Never recite it, never list it, '
+            + 'never mention "summaries" or "data". If they contradict it, trust what they say now.';
+        }
+      } catch (e) { /* memory is a bonus — never block the chat */ }
+    }
+
+    const result = await callAI(messages, faceData, false, memory);
     if (!result) return res.status(500).json({ error: 'AI unavailable — please try again' });
 
     console.log('[Chat][' + result.provider + '] "' + message.substring(0, 50) + '"');

@@ -1585,6 +1585,10 @@ function addChatMessage(role, text) {
     div.innerHTML = '<p>' + text + '</p>';
   }
   container.appendChild(div);
+  // Long-session guard: cap rendered messages so hours-long sessions
+  // never slow the page. History/persistence are unaffected — this
+  // only trims the oldest DOM nodes from view.
+  while (container.children.length > 80) container.removeChild(container.firstChild);
   // Scroll only the chat box — lock page scroll while doing it
   setTimeout(function() {
     try {
@@ -1677,7 +1681,7 @@ document.addEventListener('visibilitychange', function() {
       if (document.activeElement !== chatInput) return;
       clearTimeout(kbSettleTimer);
       kbSettleTimer = setTimeout(function() {
-        chatInput.scrollIntoView({ block: 'nearest' });
+        chatInput.scrollIntoView({ block: 'center' });
       }, 250);
     });
   }

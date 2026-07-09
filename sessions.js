@@ -112,7 +112,7 @@
         extra: { userId: S.userId, sessionId: S.active.sessionId, locale: navigator.language },
       };
     }
-    return { path: '/chat', extra: { locale: navigator.language } };
+    return { path: '/chat', extra: { locale: navigator.language, userId: S.userId } };
   }
 
   function onPremiumRequired(data) {
