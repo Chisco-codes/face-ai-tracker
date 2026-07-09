@@ -237,9 +237,14 @@ app.post('/chat', async (req, res) => {
     let memory = null;
     if (userId) {
       try {
+        const u = await db.getOrCreateUser(userId);
+        const isPremium = (u && u.plan === 'premium') || process.env.PREMIUM_ALL === 'true';
+        memory = '[USER CONTEXT]\nPlan: ' + (isPremium
+          ? 'PREMIUM member — all Deep Wellness Sessions unlocked, summaries saved.'
+          : 'Free plan — Quick Check-ins included; Deep Conversation, Focus Session, Sleep Wind-Down and saved summaries are premium.') + '\n';
         const past = await db.listSessionSummaries(userId, 2);
         if (past && past.length) {
-          memory = '[WHAT YOU REMEMBER ABOUT THIS PERSON — from their past sessions with you]\n'
+          memory += '\n[WHAT YOU REMEMBER ABOUT THIS PERSON — from their past sessions with you]\n'
             + past.map(p => '• (' + (p.modeName || p.mode) + ', '
                 + new Date(p.startedAt).toDateString() + ') '
                 + String(p.summary || '').replace(/\s+/g, ' ').substring(0, 320)).join('\n')

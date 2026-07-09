@@ -341,8 +341,8 @@
     b.id = 'aria-session-banner';
     b.className = 'aria-session-banner';
     b.innerHTML =
-      '<span class="aria-banner-dot"></span><span>' + S.active.modeName + ' — in session</span>' +
-      '<button type="button" class="aria-end-btn">End & get summary</button>';
+      '<span class="aria-banner-dot"></span><span class="aria-banner-name">' + S.active.modeName + '</span><span class="aria-banner-live">Live</span>' +
+      '<button type="button" class="aria-end-btn">End session</button>';
     b.querySelector('.aria-end-btn').addEventListener('click', endSession);
     inputRow.parentNode.insertBefore(b, inputRow);
   }
@@ -385,12 +385,62 @@
   }
 
   function renderSummary(session) {
-    systemCard(
-      '<span class="aria-summary-title">' + session.modeName + ' — Summary</span><br>' +
-      mdLite(session.summary) +
-      '<br><span class="aria-summary-meta">' + session.exchangeCount + ' exchanges · ' +
-      session.metrics.samples + ' face-metric samples · saved to your history</span>'
-    );
+    var container = document.getElementById('chat-messages');
+    if (!container) return;
+    var card = document.createElement('div');
+    card.className = 'chat-msg chat-msg--system aria-summary-card';
+
+    var dur = '';
+    if (session.startedAt && session.endedAt) {
+      var mins = Math.max(1, Math.round((new Date(session.endedAt) - new Date(session.startedAt)) / 60000));
+      dur = mins + ' min';
+    }
+
+    var head = document.createElement('div');
+    head.className = 'aria-summary-head';
+    head.innerHTML =
+      '<span class="aria-summary-kicker">Session summary</span>' +
+      '<span class="aria-summary-mode">' + session.modeName + (dur ? ' · ' + dur : '') + '</span>';
+    card.appendChild(head);
+
+    // Parse "**Heading** — body" / "**Heading**: body" sections into rows;
+    // anything unparsed renders as plain paragraphs.
+    var text = String(session.summary || '');
+    var parts = text.split(/\*\*(.+?)\*\*/); // odd indexes = headings
+    var body = document.createElement('div');
+    body.className = 'aria-summary-body';
+    if (parts.length > 2) {
+      for (var i = 1; i < parts.length; i += 2) {
+        var heading = parts[i].replace(/[\s—:-]+$/, '');
+        var content = (parts[i + 1] || '').replace(/^[\s—:-]+/, '').trim();
+        if (!content) continue;
+        var row = document.createElement('div');
+        row.className = 'aria-summary-row';
+        var h = document.createElement('span');
+        h.className = 'aria-summary-label';
+        h.textContent = heading;
+        var p = document.createElement('p');
+        p.textContent = content;
+        row.appendChild(h);
+        row.appendChild(p);
+        body.appendChild(row);
+      }
+    } else {
+      var plain = document.createElement('p');
+      plain.textContent = text;
+      body.appendChild(plain);
+    }
+    card.appendChild(body);
+
+    var foot = document.createElement('div');
+    foot.className = 'aria-summary-foot';
+    foot.textContent = session.exchangeCount + ' exchanges · ' +
+      (session.metrics && session.metrics.samples ? session.metrics.samples + ' metric samples · ' : '') +
+      'saved to your history';
+    card.appendChild(foot);
+
+    container.appendChild(card);
+    container.scrollTop = container.scrollHeight;
   }
 
   function showHistory() {
