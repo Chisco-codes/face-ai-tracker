@@ -95,7 +95,11 @@
       method: 'POST',
       body: JSON.stringify({ userId: S.userId, locale: navigator.language }),
     }).then(function (r) {
-      if (r.ok) { S.plan = r.data.plan; S.modes = r.data.modes || []; }
+      if (r.ok) {
+        S.plan = r.data.plan;
+        S.modes = r.data.modes || [];
+        S.paymentUrl = r.data.paymentUrl || PAYSTACK_PAYMENT_URL || '';
+      }
       renderButtonBadge();
     }).catch(function () { /* offline — sessions unavailable, chat still works */ });
   }
@@ -141,10 +145,11 @@
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'aria-upgrade-btn';
-    if (PAYSTACK_PAYMENT_URL) {
+    var payUrl = S.paymentUrl || PAYSTACK_PAYMENT_URL;
+    if (payUrl) {
       btn.textContent = 'Upgrade now';
       btn.addEventListener('click', function () {
-        window.open(PAYSTACK_PAYMENT_URL + '?metadata[anonId]=' + encodeURIComponent(S.userId), '_blank', 'noopener');
+        window.open(payUrl + '?metadata[anonId]=' + encodeURIComponent(S.userId), '_blank', 'noopener');
       });
     } else {
       btn.textContent = 'Join the waitlist';

@@ -787,10 +787,9 @@ async function detectionLoop() {
 function drawFaceMesh(kpts) {
   CTX.save();
 
-  // ── Contour rendering — how the big products do it ──────────
-  // Instead of a 468-dot cloud, we stroke the face's meaningful
-  // lines (oval, brows, eyes, lips) with a faint constellation
-  // behind them. Reads as a precision instrument, not face paint.
+  // ── Hybrid mesh: the original's dense constellation + red eye
+  // signature, structured by contour lines. Dense enough to feel
+  // the scan, refined enough to feel premium.
   var MESH_SCALE = Math.max(0.45, Math.min(1, CTX.canvas.width / 640));
   var LW = Math.max(0.7, 1.1 * MESH_SCALE);
 
@@ -812,24 +811,33 @@ function drawFaceMesh(kpts) {
     CTX.stroke();
   }
 
-  // Faint constellation: every 5th mesh point, barely-there
-  CTX.fillStyle = 'rgba(0,212,245,0.10)';
-  for (var i = 0; i < kpts.length; i += 5) {
+  // Dense constellation — every 2nd point, the signature scan
+  CTX.fillStyle = 'rgba(0,212,245,0.30)';
+  for (var i = 0; i < kpts.length; i += 2) {
     CTX.beginPath();
-    CTX.arc(kpts[i].x, kpts[i].y, 0.8 * MESH_SCALE, 0, Math.PI * 2);
+    CTX.arc(kpts[i].x, kpts[i].y, 0.95 * MESH_SCALE, 0, Math.PI * 2);
     CTX.fill();
   }
 
-  // Face oval — the soft frame
-  stroke(MESH_CONTOURS.FACE_OVAL, 'rgba(0,212,245,0.28)', LW, true);
-  // Eyebrows — light
-  stroke(MESH_CONTOURS.RIGHT_BROW, 'rgba(0,212,245,0.40)', LW, false);
-  stroke(MESH_CONTOURS.LEFT_BROW,  'rgba(0,212,245,0.40)', LW, false);
-  // Eyes — the focal point, brightest
-  stroke(MESH_CONTOURS.RIGHT_EYE_RING, 'rgba(0,229,255,0.85)', LW * 1.15, true);
-  stroke(MESH_CONTOURS.LEFT_EYE_RING,  'rgba(0,229,255,0.85)', LW * 1.15, true);
-  // Lips — subtle
-  stroke(MESH_CONTOURS.LIPS_OUTER, 'rgba(0,212,245,0.32)', LW, true);
+  // Structure lines
+  stroke(MESH_CONTOURS.FACE_OVAL, 'rgba(0,212,245,0.30)', LW, true);
+  stroke(MESH_CONTOURS.RIGHT_BROW, 'rgba(0,212,245,0.45)', LW, false);
+  stroke(MESH_CONTOURS.LEFT_BROW,  'rgba(0,212,245,0.45)', LW, false);
+  stroke(MESH_CONTOURS.LIPS_OUTER, 'rgba(0,212,245,0.38)', LW, true);
+
+  // Eyes — the red signature from v3.0, now as rings + tracking dots
+  stroke(MESH_CONTOURS.RIGHT_EYE_RING, 'rgba(255,64,110,0.85)', LW * 1.1, true);
+  stroke(MESH_CONTOURS.LEFT_EYE_RING,  'rgba(255,64,110,0.85)', LW * 1.1, true);
+  var eyeIdx = LM.RIGHT_EYE.concat(LM.LEFT_EYE);
+  CTX.fillStyle = 'rgba(255,64,110,0.95)';
+  for (var j = 0; j < eyeIdx.length; j++) {
+    var ep = kpts[eyeIdx[j]];
+    if (ep) {
+      CTX.beginPath();
+      CTX.arc(ep.x, ep.y, 1.5 * MESH_SCALE, 0, Math.PI * 2);
+      CTX.fill();
+    }
+  }
 
   CTX.restore();
 }
@@ -1430,6 +1438,8 @@ function liveFaceData() {
 
 
 async function runAnalysis() {
+  // Server replies 'SKIP' when there's nothing meaningful to add
+  // mid-conversation — we simply stay quiet.
   if (CHAT.isWaiting) return;
   if (CHAT.rateLimitedUntil > performance.now()) return;
   CHAT.isWaiting = true;
@@ -1442,11 +1452,19 @@ async function runAnalysis() {
       var res = await fetch(CHAT.SERVER_URL + '/analyze', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(faceData),
+        body:    JSON.stringify({ faceData: faceData, history: CHAT.history.slice(-8) }),
         signal:  AbortSignal.timeout(15000),
       });
       var data = await res.json();
-      if (res.ok && data.response) response = data.response;
+      if (res.ok && data.response) {
+        if (data.response.trim() === 'SKIP') {
+          // Aria judged there's nothing meaningful to add right now
+          removeTypingIndicator();
+          CHAT.isWaiting = false;
+          return;
+        }
+        response = data.response;
+      }
       else if (res.status === 429) CHAT.rateLimitedUntil = performance.now() + 3600000;
     } catch (e) { console.warn('[auto-analyse] server error, using local'); }
   }
@@ -1648,6 +1666,11 @@ document.addEventListener('visibilitychange', function() {
   // fought each other, which is what made the screen shake while
   // typing. Now: wait for the keyboard animation to settle, then do
   // exactly one instant, minimal scroll.
+  // Keep layout honest while typing: mark the body so CSS can add
+  // breathing room above OS bottom bars, removing overlap and jump.
+  chatInput.addEventListener('focus', function () { document.body.classList.add('keyboard-open'); });
+  chatInput.addEventListener('blur',  function () { document.body.classList.remove('keyboard-open'); });
+
   if (window.visualViewport) {
     var kbSettleTimer = null;
     window.visualViewport.addEventListener('resize', function() {

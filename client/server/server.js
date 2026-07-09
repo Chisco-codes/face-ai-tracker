@@ -112,7 +112,18 @@ function buildMessages(messages, faceData, isAnalysis, extraSystem) {
   const system = extraSystem ? ARIA_SYSTEM + '\n' + extraSystem : ARIA_SYSTEM;
   const msgs = [{ role: 'system', content: system }];
   if (isAnalysis) {
-    msgs.push({ role: 'user', content: faceCtx + 'Give one brief warm wellness check-in sentence based on this face data. Be specific and natural.' });
+    for (const m of messages) {
+      if (!m.content || !m.content.trim()) continue;
+      msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
+    }
+    msgs.push({ role: 'user', content: faceCtx
+      + '[AMBIENT OBSERVATION — this request is from the app, not the user]\n'
+      + 'Read the face data and the conversation above. If there is something genuinely '
+      + 'worth saying — a meaningful shift in their state, a caring nudge that fits this '
+      + 'exact moment — say it in ONE warm, natural sentence that CONTINUES the existing '
+      + 'conversation. Never greet again, never ask how they are if that was already '
+      + 'covered, never repeat an earlier observation, never restart the conversation. '
+      + 'If there is nothing meaningful to add right now, reply with exactly: SKIP' });
   } else {
     for (const m of messages.slice(0, -1)) {
       if (!m.content || !m.content.trim()) continue;
@@ -186,9 +197,11 @@ app.post('/analyze', async (req, res) => {
   try {
     if (!openaiClient && !groqClient)
       return res.status(500).json({ error: 'No AI configured.' });
-    const result = await callAI([], req.body, true);
+    const faceData = req.body.faceData || req.body;               // new + legacy shape
+    const history  = Array.isArray(req.body.history) ? req.body.history.slice(-8) : [];
+    const result = await callAI(history, faceData, true);
     if (!result) return res.status(500).json({ error: 'AI unavailable' });
-    console.log('[Auto][' + result.provider + '] ' + req.body.emotion + ' focus:' + req.body.focusScore);
+    console.log('[Auto][' + result.provider + '] ' + (faceData.emotion || '?') + ' focus:' + (faceData.focusScore || '?') + (history.length ? ' (in-conversation)' : ''));
     res.json({ response: result.response, timestamp: new Date().toISOString() });
   } catch (err) {
     console.error('[/analyze]', err.message);
@@ -238,6 +251,7 @@ app.post('/me', async (req, res) => {
     res.json({
       userId: user._id,
       plan: premium ? 'premium' : 'free',
+      paymentUrl: process.env.PAYSTACK_PAYMENT_URL || null,
       modes: Object.entries(sessions.SESSION_MODES).map(([key, m]) => ({
         key, name: m.name, premium: m.premium, available: !m.premium || premium,
       })),

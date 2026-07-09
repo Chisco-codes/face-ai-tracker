@@ -1364,3 +1364,18 @@ input, textarea, select {
 @media (max-width: 640px) {
   .video-wrapper.video-compact { max-width: 150px; }
 }
+
+/* ── Mobile viewport stability ─────────────────────────────── */
+/* Safari/Chrome bottom bars overlap content; give the page and the
+   chat input honest breathing room from the OS chrome. */
+body {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (max-width: 640px) {
+  .chat-input-row {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  body.keyboard-open .chat-card {
+    padding-bottom: 16px;
+  }
+}
