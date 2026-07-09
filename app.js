@@ -505,9 +505,33 @@ function makeFeedback(ear, bpm, tilt, nod, focus, elapsed, thr, emotion, conf) {
 async function loadModels() {
   updateEl('tf-status', 'Initialising...');
   try {
-    await tf.setBackend('webgl');
-    await tf.ready();
-    updateEl('tf-status', 'Ready (WebGL)');
+    // ── Backend selection ────────────────────────────────────
+    // WASM is opt-in: URL flag ?wasm=1, localStorage 'aria_backend'='wasm',
+    // or automatically inside the Capacitor Android app (window.Capacitor).
+    // WebGL stays the default for everyone else — zero risk to web users.
+    // If WASM init fails for any reason, we fall back to WebGL.
+    var wantWasm = /[?&]wasm=1/.test(location.search)
+      || (function(){ try { return localStorage.getItem('aria_backend') === 'wasm'; } catch(e){ return false; } })()
+      || (window.Capacitor && /Android/i.test(navigator.userAgent));
+    var backendUsed = 'webgl';
+    if (wantWasm && window.tf) {
+      try {
+        if (tf.wasm && tf.wasm.setWasmPaths) {
+          tf.wasm.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@3.21.0/dist/');
+        }
+        await tf.setBackend('wasm');
+        await tf.ready();
+        backendUsed = 'wasm';
+      } catch (e) {
+        console.warn('[TF] WASM backend failed, falling back to WebGL:', e.message);
+        await tf.setBackend('webgl');
+        await tf.ready();
+      }
+    } else {
+      await tf.setBackend('webgl');
+      await tf.ready();
+    }
+    updateEl('tf-status', 'Ready (' + backendUsed.toUpperCase() + ')');
 
     updateEl('emotion-model-status', 'Loading...');
     setStatus('Loading emotion model (~2MB)...', 'waiting');
@@ -1366,14 +1390,24 @@ async function sendChatMessage() {
 
   if (CHAT.serverOnline && CHAT.rateLimitedUntil <= performance.now()) {
     try {
-      var res = await fetch(CHAT.SERVER_URL + '/chat', {
+      // Session hook: when a Deep Wellness Session is active, messages
+      // route through /session/message with userId + sessionId attached.
+      // Provided by sessions.js — if absent, behaviour is identical to v1.
+      var route = (window.AriaSessions && window.AriaSessions.route)
+        ? window.AriaSessions.route()
+        : { path: '/chat', extra: {} };
+      var res = await fetch(CHAT.SERVER_URL + route.path, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: text, faceData: faceData, history: CHAT.history.slice(-12) }),
+        body:    JSON.stringify(Object.assign(
+                   { message: text, faceData: faceData, history: CHAT.history.slice(-12) },
+                   route.extra)),
         signal:  AbortSignal.timeout(20000),
       });
       var data = await res.json();
       if (res.ok && data.response) response = data.response;
+      else if (res.status === 402 && window.AriaSessions) window.AriaSessions.onPremiumRequired(data);
+      else if ((res.status === 404 || res.status === 409 || res.status === 410) && window.AriaSessions) window.AriaSessions.onSessionInvalid();
       else if (res.status === 429) CHAT.rateLimitedUntil = performance.now() + 3600000;
     } catch (e) {
       if (e.name === 'TypeError' || e.name === 'AbortError') {

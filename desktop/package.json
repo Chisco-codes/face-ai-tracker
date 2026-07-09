@@ -1,0 +1,29 @@
+{
+  "name": "face-ai-tracker-desktop",
+  "productName": "Face AI Tracker",
+  "version": "2.0.0",
+  "description": "Face AI Tracker — Aria Wellness Coach, desktop edition",
+  "main": "main.js",
+  "author": "Chisco-codes",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.0"
+  },
+  "build": {
+    "appId": "com.facewellnessai.tracker",
+    "productName": "Face AI Tracker",
+    "files": ["main.js", "preload.js", "app/**/*"],
+    "directories": { "output": "dist" },
+    "win":   { "target": "nsis", "icon": "app/icons/icon-512x512.png" },
+    "mac":   { "target": "dmg",  "icon": "app/icons/icon-512x512.png", "category": "public.app-category.healthcare-fitness" },
+    "linux": { "target": "AppImage", "icon": "app/icons/icon-512x512.png", "category": "Utility" }
+  }
+}

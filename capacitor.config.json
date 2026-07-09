@@ -1,0 +1,8 @@
+{
+  "appId": "com.facewellnessai.tracker",
+  "appName": "Face AI Tracker",
+  "webDir": "client",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false },
+  "ios": { "contentInset": "automatic" }
+}
