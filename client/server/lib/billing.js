@@ -113,14 +113,16 @@ async function createCheckout(anonId, email, callbackUrl) {
       },
       body: JSON.stringify({
         email: email,
-        plan: plan,                    // amount & interval come from the plan
+        amount: parseInt(process.env.PAYSTACK_PLAN_AMOUNT || '5000', 10), // pesewas; the plan overrides this, but the API requires the field
+        plan: plan,
+        currency: 'GHS',
         metadata: { anonId: anonId },
         callback_url: callbackUrl || 'https://www.facewellnessai.com',
       }),
     });
     const json = await res.json();
     if (!json.status || !json.data || !json.data.authorization_url) {
-      console.error('[Billing] initialize failed:', json.message || res.status);
+      console.error('[Billing] initialize failed — Paystack said:', JSON.stringify(json).substring(0, 300));
       return { error: json.message || 'Could not start checkout.', status: 502 };
     }
     return { url: json.data.authorization_url, reference: json.data.reference };
